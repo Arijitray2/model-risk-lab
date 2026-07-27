@@ -5,6 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Model Risk Lab — what a wrong model costs, in dollars</title>
 <meta name="description" content="A market-making desk bets its model knows what the world is worth. This project runs that bet on 17 years of real SPY & NIFTY 50 data — and catches the wrong model from its P/L alone.">
+<meta property="og:title" content="Model Risk Lab — the desk thinks it's printing money. The market knows better.">
+<meta property="og:description" content="Options market-making under model risk, calibrated to real SPY & NIFTY 50 data. Watch a mispriced desk get run over — live, in your browser.">
+<meta property="og:image" content="https://arijitray2.github.io/model-risk-lab/assets/og.png">
+<meta property="og:url" content="https://arijitray2.github.io/model-risk-lab/">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://arijitray2.github.io/model-risk-lab/assets/og.png">
 <link rel="stylesheet" href="assets/style.css">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='18' fill='%230b0f14'/><text x='18' y='72' font-size='60' fill='%2327c93f' font-family='monospace'>▮</text></svg>">
 </head>
@@ -36,20 +43,27 @@
   <div class="termwin">
     <div class="termbar">
       <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
-      <span class="termtitle">desk — quoting 3M ATM puts — pricing: BLACK-SCHOLES · world: MERTON(COVID)</span>
+      <span class="termtitle">desk-race — two desks · identical market · different models</span>
     </div>
     <div class="termbody">
-      <div class="tickrow">
+      <div class="bootline" id="bootline"><span class="caret"></span></div>
+      <div class="tickrow" id="tickrow" style="opacity:0;transition:opacity .5s">
         <span>SPOT <b id="tkSpot">100.00</b></span>
-        <span>TRADES <b id="tkTrades">0</b></span>
-        <span>DESK BELIEVES <b class="up" id="tkBel">+0.00</b></span>
-        <span>REALISED P/L <b id="tkReal">+0.00</b></span>
+        <span>JUMPS <b id="tkJumps">0</b></span>
+        <span style="color:var(--green)">RIGHT MODEL <b class="up" id="tkGood">+0.00</b></span>
+        <span style="color:var(--red)">WRONG MODEL <b id="tkBad">+0.00</b></span>
         <span id="tkJump" style="opacity:0;color:var(--red)">▼ JUMP</span>
       </div>
       <canvas id="heroCanvas"></canvas>
+      <div class="race-legend" id="raceLegend" style="opacity:0;transition:opacity .5s">
+        <span><span class="sw" style="background:#3987e5"></span>market (shared)</span>
+        <span><span class="sw" style="background:#27c93f"></span>desk pricing Merton (right model)</span>
+        <span><span class="sw" style="background:#e66767"></span>desk pricing Black–Scholes (wrong model)</span>
+        <span style="margin-left:auto">type <kbd class="kbd">crash</kbd> · press <kbd class="kbd">Ctrl</kbd>+<kbd class="kbd">K</kbd></span>
+      </div>
     </div>
   </div>
-  <p class="sub">Live simulation running in your browser — same engine as the <a href="demo.html">full demo</a>. It resets and replays forever; the ending never changes.</p>
+  <p class="sub">Live in your browser — both desks are quoted the <i>same</i> random market. Same jumps, same clients. Only the model differs.</p>
 
   <div class="btn-row">
     <a class="btn primary" href="demo.html">▶ run the full simulator</a>
@@ -79,8 +93,38 @@
   </div>
 </section>
 
+<!-- ================= scroll story ================= -->
+<section id="story">
+  <div class="story-stick">
+    <h2 class="term" style="margin-top:0"><span class="prompt">$</span><span>replay </span><span class="flag">--what-actually-happens</span></h2>
+    <div class="story-frame">
+      <canvas id="storyCanvas"></canvas>
+    </div>
+    <div class="story-progress"><i id="storyBar"></i></div>
+    <div class="story-cap">
+      <div class="cap on" id="cap0">
+        <span class="tag" style="color:var(--blue)">act i — the assumed world</span>
+        <p><b>This is the world Black–Scholes believes in.</b> Smooth, continuous,
+        Gaussian — every move small enough for a delta hedge to follow. Keep scrolling.</p>
+      </div>
+      <div class="cap" id="cap1">
+        <span class="tag" style="color:var(--red)">act ii — the real world</span>
+        <p><b>The real world gaps.</b> Same market, now with the jumps the options market
+        actually priced on 16 March 2020: λ = 3.7 crashes/year, mean −31%. No hedge can
+        follow a discontinuity.</p>
+      </div>
+      <div class="cap" id="cap2">
+        <span class="tag" style="color:var(--green)">act iii — belief vs cash</span>
+        <p><b>The desk's books climb. Its cash doesn't.</b> Green: the edge its model
+        reports (+0.15/contract). Red: what it actually earns (−10.20). That vertical gap
+        is model risk, measured in dollars — and it's detectable in three weeks.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
 <section class="reveal">
-  <h2 class="term"><span class="prompt">$</span>whoami <span class="flag">--project</span></h2>
+  <h2 class="term"><span class="prompt">$</span><span>whoami </span><span class="flag">--project</span></h2>
   <p class="sub">A market-making teaching idea, rebuilt as a statistically rigorous model-risk study.</p>
   <p>
     A market maker earns the bid–ask spread by quoting around <i>fair value</i> —
@@ -117,7 +161,7 @@
 </section>
 
 <section class="reveal">
-  <h2 class="term"><span class="prompt">$</span>diff <span class="flag">belief reality</span></h2>
+  <h2 class="term"><span class="prompt">$</span><span>diff </span><span class="flag">belief reality</span></h2>
   <p class="sub">Same desk, same spread, same clients. Only the model assumption differs.</p>
   <figure class="fig">
     <img src="assets/figures/fig4_equity.svg" alt="Equity curves: matched model desk earns the spread; mispriced desk believes it is profitable while losing heavily">
@@ -130,7 +174,7 @@
 </section>
 
 <section class="reveal">
-  <h2 class="term"><span class="prompt">$</span>cat <span class="flag">design-principles</span></h2>
+  <h2 class="term"><span class="prompt">$</span><span>cat </span><span class="flag">design-principles</span></h2>
   <ol class="pill-steps" style="margin-top:16px">
     <li><b>Real data, not assumed parameters.</b> Every model parameter in the
       headline experiments is estimated from market data — physical measure from
@@ -147,7 +191,7 @@
 </section>
 
 <section class="reveal">
-  <h2 class="term"><span class="prompt">$</span>ls <span class="flag">./explore</span></h2>
+  <h2 class="term"><span class="prompt">$</span><span>ls </span><span class="flag">./explore</span></h2>
   <div class="grid c3" style="margin-top:16px">
     <div class="card"><h3>▶ Live demo</h3>
       <p>The full desk simulator runs in your browser — pick the true world and the
@@ -178,131 +222,330 @@
 
 <footer><div class="foot-inner">
   <div>model-risk-lab · built by <b>Arijit Ray</b></div>
-  <div><a href="https://github.com/Arijitray2/model-risk-lab">source &amp; data on github</a></div>
+  <div><a href="https://github.com/Arijitray2/model-risk-lab">source &amp; data on github</a> · press <kbd class="kbd">Ctrl</kbd>+<kbd class="kbd">K</kbd></div>
 </div></footer>
 
+<script src="assets/ui.js"></script>
 <script>
 "use strict";
-/* ============ hero: live mispriced desk ============ */
+const REDUCE = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/* ================= hero: the desk race ================= */
 (function(){
   const cv = document.getElementById("heroCanvas");
   const ctx = cv.getContext("2d");
   let W, H, dpr;
   function size(){
-    dpr = window.devicePixelRatio || 1;
-    W = cv.clientWidth; H = cv.clientHeight;
+    dpr = devicePixelRatio || 1;
+    cv.style.height = "340px"; W = cv.clientWidth; H = 340;
     cv.width = W * dpr; cv.height = H * dpr;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
   size(); addEventListener("resize", size);
 
-  // Merton world (COVID-flavoured), one tick per frame-ish
-  const SIG = 0.116, LAM = 3.68, MUJ = -0.22, SIGJ = 0.12, DT = 1/250;
-  const N = 260;                       // visible ticks
-  let S, path, bel, real, trades, jumpFlash, t;
+  const SIG = 0.116, LAM = 3.68, MUJ = -0.22, SIGJ = 0.12, DT = 1/250, N = 260;
+  let S, path, good, bad, gPath, bPath, jumps, jumpFlash, t, booted = false;
   function reset(){
-    S = 100; path = [S]; bel = 0; real = 0; trades = 0; jumpFlash = 0; t = 0;
+    S = 100; path = [S]; good = 0; bad = 0; gPath = [0]; bPath = [0];
+    jumps = 0; jumpFlash = 0; t = 0;
   }
   reset();
   function nrm(){ let u=0,v=0; while(!u)u=Math.random(); while(!v)v=Math.random();
     return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v); }
 
-  const fmt = (x)=> (x>=0?"+":"") + x.toFixed(2);
-  const elS = document.getElementById("tkSpot"), elT = document.getElementById("tkTrades"),
-        elB = document.getElementById("tkBel"), elR = document.getElementById("tkReal"),
-        elJ = document.getElementById("tkJump");
+  const el = id => document.getElementById(id);
+  const fmt = x => (x>=0?"+":"") + x.toFixed(2);
 
-  let frame = 0;
+  function applyJump(sizeMult){
+    S *= Math.exp(MUJ * sizeMult + SIGJ*nrm()*0.5);
+    good -= (2.5 + 2*Math.random()) * sizeMult;   // priced-in, partly compensated
+    bad  -= (16 + 9*Math.random()) * sizeMult;    // never saw it coming
+    jumps++; jumpFlash = 16;
+  }
+  window.__injectCrash = function(){
+    applyJump(1.6);
+    path.push(S); if (path.length > N) path.shift();
+    gPath.push(good); bPath.push(bad);
+    if (gPath.length > N){ gPath.shift(); bPath.shift(); }
+    el("tkJump").textContent = "▼ MANUAL CRASH INJECTED";
+    setTimeout(()=>{ el("tkJump").textContent = "▼ JUMP"; }, 1800);
+  };
+
   function step(){
-    // world tick
-    let jumped = false;
     let x = (0.06 - SIG*SIG/2)*DT + SIG*Math.sqrt(DT)*nrm();
-    if (Math.random() < LAM*DT){ x += MUJ + SIGJ*nrm(); jumped = true; }
     S *= Math.exp(x);
+    let jumped = false;
+    if (Math.random() < LAM*DT){ applyJump(1); jumped = true; }
     path.push(S); if (path.length > N) path.shift();
 
-    // desk economics (stylised): fills arrive, desk believes +0.15 each,
-    // reality bleeds the mispricing and takes jump hits.
     const fills = (Math.random() < 0.75) ? 1 : 0;
-    trades += fills;
-    bel += 0.15 * fills;
-    real += fills * (0.15 - 0.9 + 0.35*nrm());
-    if (jumped){ real -= 18 + 10*Math.random(); jumpFlash = 14; }
+    good += fills * (0.22 + 0.30*nrm()*0.5);      // edge + jump premium, small noise
+    bad  += fills * (-0.75 + 0.30*nrm()*0.5);     // believes +0.15, truth bleeds
+    gPath.push(good); bPath.push(bad);
+    if (gPath.length > N){ gPath.shift(); bPath.shift(); }
 
-    elS.textContent = S.toFixed(2);
-    elT.textContent = trades;
-    elB.textContent = fmt(bel);
-    elR.textContent = fmt(real);
-    elR.className = real >= 0 ? "up" : "dn";
-    elJ.style.opacity = jumpFlash > 0 ? 1 : 0;
+    el("tkSpot").textContent = S.toFixed(2);
+    el("tkJumps").textContent = jumps;
+    el("tkGood").textContent = fmt(good);
+    el("tkGood").className = good >= 0 ? "up" : "dn";
+    el("tkBad").textContent = fmt(bad);
+    el("tkBad").className = bad >= 0 ? "up" : "dn";
+    el("tkJump").style.opacity = jumpFlash > 0 ? 1 : 0;
 
-    t++;
-    if (t > 900) reset();              // loop the story
+    if (++t > 950) reset();
+  }
+
+  const TOP = 0.52;                                // market pane share
+  function pane(arr, y0, y1, color, glow, label){
+    const lo = Math.min(...arr), hi = Math.max(...arr), pad = (hi-lo)*0.14 + 1e-9;
+    const y = v => y1 - ((v - lo + pad) / (hi - lo + 2*pad)) * (y1 - y0);
+    const x = i => ((i + (N - arr.length)) / (N-1)) * W;
+    ctx.lineWidth = 1.8; ctx.lineJoin = "round";
+    ctx.shadowColor = glow; ctx.shadowBlur = 8; ctx.strokeStyle = color;
+    ctx.beginPath();
+    arr.forEach((v,i)=>{ i ? ctx.lineTo(x(i), y(v)) : ctx.moveTo(x(i), y(v)); });
+    ctx.stroke(); ctx.shadowBlur = 0;
+    const ly = y(arr[arr.length-1]);
+    ctx.fillStyle = color; ctx.beginPath();
+    ctx.arc(x(arr.length-1), ly, 3, 0, 7); ctx.fill();
+    if (label){ ctx.font = "10.5px ui-monospace,monospace"; ctx.fillStyle = "rgba(159,176,191,.9)";
+      ctx.fillText(label, 10, y0 + 13); }
+    return y;
   }
 
   function draw(){
     ctx.clearRect(0, 0, W, H);
-    // grid
-    ctx.strokeStyle = "rgba(255,255,255,0.05)"; ctx.lineWidth = 1;
-    for (let gy = 0.5; gy < H; gy += 42){ ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(W, gy); ctx.stroke(); }
-    // scale
-    const lo = Math.min(...path), hi = Math.max(...path), pad = (hi-lo)*0.12 + 1e-9;
-    const y = (v)=> H - ((v - lo + pad) / (hi - lo + 2*pad)) * H;
-    const x = (i)=> (i / (N-1)) * W;
-    // jump flash wash
+    ctx.strokeStyle = "rgba(255,255,255,0.045)";
+    for (let gy = 0.5; gy < H; gy += 40){ ctx.beginPath(); ctx.moveTo(0,gy); ctx.lineTo(W,gy); ctx.stroke(); }
     if (jumpFlash > 0){
-      ctx.fillStyle = `rgba(230,103,103,${0.05 + 0.02*jumpFlash})`;
+      ctx.fillStyle = `rgba(230,103,103,${0.04 + 0.02*jumpFlash})`;
       ctx.fillRect(0, 0, W, H); jumpFlash--;
     }
-    // path glow
-    ctx.lineWidth = 2; ctx.lineJoin = "round";
-    ctx.shadowColor = "rgba(57,135,229,0.8)"; ctx.shadowBlur = 10;
-    ctx.strokeStyle = "#3987e5";
-    ctx.beginPath();
-    const off = N - path.length;
-    path.forEach((v,i)=>{ const px = x(off+i), py = y(v); i ? ctx.lineTo(px,py) : ctx.moveTo(px,py); });
-    ctx.stroke();
-    ctx.shadowBlur = 0;
-    // last-price marker + label
-    const lpx = x(off + path.length - 1), lpy = y(path[path.length-1]);
-    ctx.fillStyle = "#3987e5"; ctx.beginPath(); ctx.arc(lpx, lpy, 3.5, 0, 7); ctx.fill();
-    ctx.font = "11px ui-monospace, monospace"; ctx.fillStyle = "rgba(232,237,242,.85)";
-    ctx.fillText(path[path.length-1].toFixed(2), Math.min(lpx + 8, W - 44), lpy - 6);
+    const split = H * TOP;
+    pane(path, 8, split - 6, "#3987e5", "rgba(57,135,229,.8)", "MARKET — merton(covid), shared by both desks");
+    ctx.strokeStyle = "rgba(255,255,255,0.10)";
+    ctx.beginPath(); ctx.moveTo(0, split); ctx.lineTo(W, split); ctx.stroke();
+    // shared-scale P/L pane
+    const all = gPath.concat(bPath);
+    const lo = Math.min(...all), hi = Math.max(...all), pad = (hi-lo)*0.14 + 1e-9;
+    const y = v => (H-8) - ((v - lo + pad) / (hi - lo + 2*pad)) * (H - 8 - (split + 6));
+    const x = i => ((i + (N - gPath.length)) / (N-1)) * W;
+    ctx.font = "10.5px ui-monospace,monospace"; ctx.fillStyle = "rgba(159,176,191,.9)";
+    ctx.fillText("DESK P/L — same fills, different models", 10, split + 17);
+    // zero line
+    ctx.strokeStyle = "rgba(255,255,255,0.12)"; ctx.setLineDash([3,4]);
+    ctx.beginPath(); ctx.moveTo(0, y(0)); ctx.lineTo(W, y(0)); ctx.stroke(); ctx.setLineDash([]);
+    [[gPath, "#27c93f", "rgba(39,201,63,.7)"], [bPath, "#e66767", "rgba(230,103,103,.7)"]]
+      .forEach(([arr, c, g])=>{
+        ctx.lineWidth = 2; ctx.shadowColor = g; ctx.shadowBlur = 8; ctx.strokeStyle = c;
+        ctx.beginPath();
+        arr.forEach((v,i)=>{ i ? ctx.lineTo(x(i), y(v)) : ctx.moveTo(x(i), y(v)); });
+        ctx.stroke(); ctx.shadowBlur = 0;
+        ctx.fillStyle = c; ctx.beginPath(); ctx.arc(x(arr.length-1), y(arr[arr.length-1]), 3, 0, 7); ctx.fill();
+      });
   }
 
+  /* ---- boot sequence ---- */
+  const BOOT = [
+    ["$ ./run_desk --world merton:covid --race black-scholes merton", 24],
+    ["loading calibration (SPY chain 2020-03-16) ... <span class='ok'>ok</span>", 10],
+    ["spawning desks ... <span class='ok'>2/2 quoting</span> — market open", 10],
+  ];
+  const bl = document.getElementById("bootline");
+  function boot(i){
+    if (REDUCE || i >= BOOT.length){
+      bl.style.display = "none";
+      document.getElementById("tickrow").style.opacity = 1;
+      document.getElementById("raceLegend").style.opacity = 1;
+      booted = true; return;
+    }
+    const [html, speed] = BOOT[i];
+    // type plain text, then swap in html (keeps <span class=ok> simple)
+    const plain = html.replace(/<[^>]+>/g, "");
+    let c = 0;
+    (function type(){
+      c++;
+      bl.innerHTML = plain.slice(0, c) + '<span class="caret"></span>';
+      if (c < plain.length) setTimeout(type, speed);
+      else { bl.innerHTML = html + '<span class="caret"></span>';
+             setTimeout(()=>boot(i+1), 260); }
+    })();
+  }
+
+  let frame = 0;
   function loop(){
     frame++;
-    if (frame % 2 === 0) step();       // ~30 ticks/sec
+    if (booted && frame % 2 === 0) step();
     draw();
     requestAnimationFrame(loop);
   }
-  if (matchMedia("(prefers-reduced-motion: reduce)").matches){
-    for (let i = 0; i < N; i++) step(); draw();
-  } else loop();
+  if (REDUCE){
+    booted = true;
+    for (let i = 0; i < 500; i++) step();
+    draw();
+    document.getElementById("tickrow").style.opacity = 1;
+    document.getElementById("raceLegend").style.opacity = 1;
+    bl.style.display = "none";
+  } else { boot(0); loop(); }
+
+  if (location.hash === "#crash"){
+    setTimeout(()=>{ if (window.__injectCrash) window.__injectCrash(); }, 2600);
+  }
 })();
 
-/* ============ count-up stats + reveal on scroll ============ */
+/* ================= count-up stats ================= */
 (function(){
-  const io = new IntersectionObserver((entries)=>{
-    entries.forEach(e=>{
+  const io = new IntersectionObserver((es)=>{
+    es.forEach(e=>{
       if (!e.isIntersecting) return;
-      e.target.classList.add("in");
-      e.target.querySelectorAll("[data-count]").forEach(el=>{
-        if (el.dataset.done) return; el.dataset.done = 1;
-        const target = parseFloat(el.dataset.count), dec = +el.dataset.dec;
-        const pre = el.dataset.pre || "", post = el.dataset.post || "";
-        const t0 = performance.now(), DUR = 1400;
-        (function tick(now){
-          const p = Math.min((now - t0)/DUR, 1), ease = 1 - Math.pow(1-p, 3);
-          const v = target * ease;
-          el.textContent = pre + (target>0 && pre==="+" ? "" : "") + v.toFixed(dec) + post;
-          if (p < 1) requestAnimationFrame(tick);
-        })(t0);
-      });
-      io.unobserve(e.target);
+      const elx = e.target;
+      if (elx.dataset.done) return; elx.dataset.done = 1;
+      const target = parseFloat(elx.dataset.count), dec = +elx.dataset.dec;
+      const pre = elx.dataset.pre || "", post = elx.dataset.post || "";
+      const t0 = performance.now(), DUR = 1400;
+      (function tick(now){
+        const p = Math.min((now - t0)/DUR, 1), ease = 1 - Math.pow(1-p, 3);
+        elx.textContent = pre + (target * ease).toFixed(dec) + post;
+        if (p < 1) requestAnimationFrame(tick);
+      })(t0);
+      io.unobserve(elx);
     });
-  }, { threshold: 0.25 });
-  document.querySelectorAll(".reveal").forEach(s=>io.observe(s));
+  }, { threshold: 0.5 });
+  document.querySelectorAll("[data-count]").forEach(s=>io.observe(s));
+})();
+
+/* ================= scroll story ================= */
+(function(){
+  const sec = document.getElementById("story");
+  const cv = document.getElementById("storyCanvas");
+  const ctx = cv.getContext("2d");
+  const bar = document.getElementById("storyBar");
+  const caps = [0,1,2].map(i=>document.getElementById("cap"+i));
+  let W, H, dpr;
+  function size(){
+    dpr = devicePixelRatio || 1;
+    cv.style.height = "380px"; W = cv.clientWidth; H = 380;
+    cv.width = W*dpr; cv.height = H*dpr; ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+  size(); addEventListener("resize", ()=>{ size(); render(lastP); });
+
+  // deterministic paths (seeded)
+  function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+  function mkNrm(rand){ let sp=null; return ()=>{ if(sp!==null){const v=sp;sp=null;return v;}
+    let u=0;while(!u)u=rand(); const v2=rand(); const m=Math.sqrt(-2*Math.log(u));
+    sp=m*Math.sin(2*Math.PI*v2); return m*Math.cos(2*Math.PI*v2); }; }
+
+  const M = 340, DT = 1/250;
+  function build(){
+    const r1 = mulberry32(11), n1 = mkNrm(r1);
+    const smooth = [100];
+    for (let i=1;i<M;i++) smooth.push(smooth[i-1]*Math.exp((0.06-0.02)*DT + 0.20*Math.sqrt(DT)*n1()));
+    const r2 = mulberry32(11), n2 = mkNrm(r2);        // same diffusion seed
+    const r3 = mulberry32(77);
+    const jumpy = [100], jidx = [];
+    for (let i=1;i<M;i++){
+      let x = (0.06-0.0067)*DT + 0.116*Math.sqrt(DT)*n2();
+      if (r3() < 3.68*DT*1.6){ x += -0.20 + 0.10*(r3()-0.5); jidx.push(i); }
+      jumpy.push(jumpy[i-1]*Math.exp(x));
+    }
+    const r4 = mulberry32(5), n4 = mkNrm(r4);
+    const belief = [0], cash = [0];
+    let ji = 0;
+    for (let i=1;i<M;i++){
+      belief.push(belief[i-1] + 0.16 + 0.02*n4());
+      let d = -0.60 + 0.25*n4();
+      if (jidx.includes(i)) d -= 14 + 6*r4();
+      cash.push(cash[i-1] + d);
+    }
+    return { smooth, jumpy, jidx, belief, cash };
+  }
+  const D = build();
+
+  function drawSeries(arr, frac, y0, y1, color, glow, dash){
+    const n = Math.max(2, Math.floor(arr.length * frac));
+    const sl = arr.slice(0, n);
+    const lo = Math.min(...arr), hi = Math.max(...arr), pad=(hi-lo)*0.10+1e-9;
+    const y = v => y1 - ((v-lo+pad)/(hi-lo+2*pad))*(y1-y0);
+    const x = i => (i/(arr.length-1))*(W-24)+12;
+    ctx.lineWidth = 2.2; ctx.lineJoin="round";
+    ctx.shadowColor = glow; ctx.shadowBlur = 10; ctx.strokeStyle = color;
+    if (dash) ctx.setLineDash([6,5]);
+    ctx.beginPath();
+    sl.forEach((v,i)=>{ i?ctx.lineTo(x(i),y(v)):ctx.moveTo(x(i),y(v)); });
+    ctx.stroke(); ctx.setLineDash([]); ctx.shadowBlur = 0;
+    ctx.fillStyle = color; ctx.beginPath();
+    ctx.arc(x(n-1), y(sl[n-1]), 3.5, 0, 7); ctx.fill();
+    return { x, y, n };
+  }
+
+  let lastP = 0;
+  function render(p){
+    lastP = p;
+    ctx.clearRect(0,0,W,H);
+    ctx.strokeStyle = "rgba(255,255,255,0.045)";
+    for (let gy=0.5; gy<H; gy+=40){ ctx.beginPath(); ctx.moveTo(0,gy); ctx.lineTo(W,gy); ctx.stroke(); }
+    ctx.font = "11px ui-monospace,monospace";
+
+    caps.forEach((c,i)=>c.classList.toggle("on",
+      (i===0&&p<0.34)||(i===1&&p>=0.34&&p<0.67)||(i===2&&p>=0.67)));
+    bar.style.width = (p*100).toFixed(1)+"%";
+
+    if (p < 0.34){
+      const f = Math.min(p/0.30, 1);
+      drawSeries(D.smooth, 0.15+0.85*f, 20, H-20, "#3987e5", "rgba(57,135,229,.8)");
+      ctx.fillStyle = "rgba(159,176,191,.9)";
+      ctx.fillText("GBM — σ=0.20 (SPY fit) · continuous · hedgeable", 12, 18);
+    } else if (p < 0.67){
+      const f = Math.min((p-0.34)/0.29, 1);
+      drawSeries(D.jumpy, 0.15+0.85*f, 20, H-20, "#3987e5", "rgba(57,135,229,.8)");
+      // mark jumps that have appeared
+      const n = Math.floor(D.jumpy.length*(0.15+0.85*f));
+      D.jidx.filter(i=>i<n).forEach(i=>{
+        const xx=(i/(D.jumpy.length-1))*(W-24)+12;
+        ctx.fillStyle="rgba(230,103,103,.16)"; ctx.fillRect(xx-3,0,6,H);
+      });
+      ctx.fillStyle = "rgba(159,176,191,.9)";
+      ctx.fillText("MERTON — calibrated to the 2020-03-16 SPY chain · gaps", 12, 18);
+    } else {
+      const f = Math.min((p-0.67)/0.30, 1);
+      const both = D.belief.concat(D.cash);
+      const lo=Math.min(...both), hi=Math.max(...both), pad=(hi-lo)*0.1+1e-9;
+      const y=v=>(H-20)-((v-lo+pad)/(hi-lo+2*pad))*(H-40);
+      const x=i=>(i/(M-1))*(W-24)+12;
+      const n=Math.max(2,Math.floor(M*(0.15+0.85*f)));
+      ctx.strokeStyle="rgba(255,255,255,0.12)"; ctx.setLineDash([3,4]);
+      ctx.beginPath(); ctx.moveTo(0,y(0)); ctx.lineTo(W,y(0)); ctx.stroke(); ctx.setLineDash([]);
+      [[D.belief,"#27c93f","rgba(39,201,63,.7)",true],[D.cash,"#e66767","rgba(230,103,103,.7)",false]]
+        .forEach(([arr,c,g,dash])=>{
+          ctx.lineWidth=2.2; ctx.shadowColor=g; ctx.shadowBlur=10; ctx.strokeStyle=c;
+          if(dash)ctx.setLineDash([6,5]);
+          ctx.beginPath();
+          arr.slice(0,n).forEach((v,i)=>{ i?ctx.lineTo(x(i),y(v)):ctx.moveTo(x(i),y(v)); });
+          ctx.stroke(); ctx.setLineDash([]); ctx.shadowBlur=0;
+        });
+      ctx.fillStyle="#27c93f"; ctx.fillText("what the desk believes", x(n-1)-150, y(D.belief[n-1])-8);
+      ctx.fillStyle="#e66767"; ctx.fillText("what it actually earns", x(n-1)-146, y(D.cash[n-1])+16);
+      // the gap
+      if (f>0.5){
+        ctx.strokeStyle="rgba(255,189,46,.7)"; ctx.setLineDash([2,3]);
+        ctx.beginPath(); ctx.moveTo(x(n-1)+6,y(D.belief[n-1])); ctx.lineTo(x(n-1)+6,y(D.cash[n-1])); ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle="#ffbd2e";
+        ctx.fillText("model risk, in $", Math.min(x(n-1)+12, W-110), (y(D.belief[n-1])+y(D.cash[n-1]))/2);
+      }
+      ctx.fillStyle = "rgba(159,176,191,.9)";
+      ctx.fillText("SAME DESK · SAME MARKET — accounting vs cash", 12, 18);
+    }
+  }
+
+  function onScroll(){
+    const r = sec.getBoundingClientRect();
+    const total = r.height - innerHeight * 0.9;
+    const p = Math.min(1, Math.max(0, -r.top / Math.max(total, 1)));
+    render(p);
+  }
+  if (REDUCE){ render(1); }
+  else { addEventListener("scroll", onScroll, { passive: true }); onScroll(); }
 })();
 </script>
 
