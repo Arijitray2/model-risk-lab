@@ -1,5 +1,7 @@
 # Model Risk Lab
 
+[![tests](https://github.com/Arijitray2/model-risk-lab/actions/workflows/tests.yml/badge.svg)](https://github.com/Arijitray2/model-risk-lab/actions/workflows/tests.yml)
+
 **What a wrong pricing model costs an options market-making desk — in dollars.**
 Calibrated to real SPY & NIFTY 50 data, with a full statistical model-validation suite.
 
@@ -85,4 +87,4 @@ Educational research project — not trading or investment advice.
 
 ## Author
 
-**Arijit Ray** — MSc Statistics, IIT Bombay.
+**Arijit Ray** — ray.asokekumar@gmail.com

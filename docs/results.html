@@ -11,6 +11,7 @@
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="https://arijitray2.github.io/model-risk-lab/assets/og.png">
 <link rel="stylesheet" href="assets/style.css">
+<script src="assets/vendor/plotly.min.js"></script>
 </head>
 <body>
 
@@ -35,14 +36,14 @@ JSON files in this site's <code>assets/</code>.</p>
 <p>Seventeen-plus years of daily returns on each index, fitted by maximum likelihood.</p>
 <div id="tblPhysical"></div>
 <figure class="fig">
-  <img src="assets/figures/fig1_densities.svg" alt="Return densities: empirical vs GBM vs Merton on log scale">
+  <img loading="lazy" src="assets/figures/fig1_densities.svg" alt="Return densities: empirical vs GBM vs Merton on log scale">
   <figcaption><b>Fig 1.</b> Daily-return densities on a log scale. The Gaussian (orange)
   collapses many decades too fast in the tails; the fitted Merton mixture (blue) tracks the
   empirical points (grey) across the entire range — including crash days a GBM world
   essentially forbids.</figcaption>
 </figure>
 <figure class="fig">
-  <img src="assets/figures/fig2_qq_spy.svg" alt="QQ plots of SPY returns against GBM and Merton">
+  <img loading="lazy" src="assets/figures/fig2_qq_spy.svg" alt="QQ plots of SPY returns against GBM and Merton">
   <figcaption><b>Fig 2.</b> QQ plots for SPY. Against GBM the empirical quantiles peel off
   the diagonal violently in both tails; against the fitted Merton model they sit close to
   the line — the jump mixture owns the tails.</figcaption>
@@ -51,46 +52,45 @@ JSON files in this site's <code>assets/</code>.</p>
 <h2>2 · What the options market believes</h2>
 <p>Merton fitted to four real SPY chains (~90 days to expiry), OTM quotes, vega-weighted.</p>
 <div id="tblRN"></div>
-<figure class="fig">
-  <img src="assets/figures/fig3_smiles.svg" alt="Implied volatility smiles and Merton fits on four real dates">
-  <figcaption><b>Fig 3.</b> Real implied-volatility skews (grey dots) vs the 4-parameter
-  Merton fit (blue) and the flat smile Black&ndash;Scholes implies (orange dashed). Even in
-  the calmest market the smile prices roughly one &minus;10% jump per year; in March 2020
-  it priced &lambda;&nbsp;&asymp;&nbsp;3.7 crashes/year with mean size &minus;31%.</figcaption>
-</figure>
+<div class="chart-box">
+  <div class="preset-row" id="smileChips" style="margin:10px 10px 0"></div>
+  <div id="chSmile" style="height:380px"></div>
+</div>
+<p class="sub" style="margin-top:8px"><b style="color:var(--ink)">Fig 3 (interactive).</b>
+Real SPY implied-vol skew (dots) vs the 4-parameter Merton fit (line) and the flat
+Black&ndash;Scholes smile (dashed). Switch dates; hover for exact values; drag to zoom.</p>
 
 <h2>3 · The desk under model risk</h2>
 <div id="tblDesk"></div>
+<div class="chart-box">
+  <div class="preset-row" id="eqChips" style="margin:10px 10px 0"></div>
+  <div id="chEq" style="height:360px"></div>
+</div>
+<p class="sub" style="margin-top:8px"><b style="color:var(--ink)">Fig 4 (interactive).</b>
+One representative seed per scenario: realised P/L vs the edge the desk believes vs true
+expected edge. Hover to read the gap in dollars at any date.</p>
 <figure class="fig">
-  <img src="assets/figures/fig4_equity.svg" alt="Equity curves matched vs mispriced desk">
-  <figcaption><b>Fig 4.</b> One representative seed. Matched desk (left): realised P/L
-  climbs along the believed and true edge lines. Mispriced desk (right): belief and
-  reality diverge from the first fill.</figcaption>
-</figure>
-<figure class="fig">
-  <img src="assets/figures/fig5_pnl_distributions.svg" alt="P/L distributions across seeds for four scenarios">
+  <img loading="lazy" src="assets/figures/fig5_pnl_distributions.svg" alt="P/L distributions across seeds for four scenarios">
   <figcaption><b>Fig 5.</b> One-year P/L distribution across seeds (symlog scale).
   Note both mismatched scenarios lose catastrophically <i>in both directions of
   mispricing</i> — with price-elastic clients, quoting too high is punished by adverse
   selection just as quoting too low is punished by the steamroller.</figcaption>
 </figure>
-<figure class="fig">
-  <img src="assets/figures/fig6_breakeven.svg" alt="Break-even spread curves">
-  <figcaption><b>Fig 6.</b> Loss probability vs quoted half-spread. The matched desk is
-  95%-safe from 8.8&cent;. The mispriced desk's curve decays so slowly that no half-spread
-  below $15 clears the bar — spread cannot buy back a wrong model when flow is informed.</figcaption>
-</figure>
+<div class="chart-box"><div id="chBe" style="height:340px"></div></div>
+<p class="sub" style="margin-top:8px"><b style="color:var(--ink)">Fig 6 (interactive).</b>
+Loss probability vs quoted half-spread (log x). The matched desk clears the 5% bar at
+8.8&cent;; the mispriced desk never gets there below $15.</p>
 
 <h2>4 · Validation: catching it from P/L alone</h2>
 <div id="tblVal"></div>
 <figure class="fig">
-  <img src="assets/figures/fig8_var_exceptions.svg" alt="VaR exception timelines">
+  <img loading="lazy" src="assets/figures/fig8_var_exceptions.svg" alt="VaR exception timelines">
   <figcaption><b>Fig 7.</b> 5% VaR exception timeline over a six-year run. Matched desk:
   83 exceptions vs 75 expected, scattered (Kupiec p = 0.35). Mispriced desk: 811,
   clustered into jump episodes (Kupiec and Christoffersen p &lt; 10<sup>&minus;16</sup>).</figcaption>
 </figure>
 <figure class="fig">
-  <img src="assets/figures/fig7_cusum.svg" alt="CUSUM monitoring paths">
+  <img loading="lazy" src="assets/figures/fig7_cusum.svg" alt="CUSUM monitoring paths">
   <figcaption><b>Fig 8.</b> One-sided CUSUM on spot-scaled edge residuals. The matched
   desk's statistic breathes below threshold for 900+ trades; the mispriced desk crosses
   at trade 83 — an alarm roughly three weeks into a six-year run.</figcaption>
@@ -174,14 +174,87 @@ async function j(name){const r=await fetch("assets/"+name);if(!r.ok)throw 0;retu
   <td>Detection ~3 weeks into a 6-year run, at a false-alarm rate of zero on the matched desk.</td></tr>`;
   h+=`</table>`;
   document.getElementById("tblVal").innerHTML=h;
+
+  /* ---------- interactive charts ---------- */
+  const DK={SURF:"#11161d",GRID:"#262c33",INK:"#e8edf2",INK2:"#c3c2b7",
+            BLUE:"#3987e5",ORANGE:"#d95926",AQUA:"#199e70",RED:"#e66767",GREY:"#9fb0bf"};
+  const lay=(t,xt,yt,extra)=>Object.assign({
+    title:{text:t,font:{size:13,color:DK.INK},x:0.02},
+    margin:{l:58,r:18,t:64,b:42},paper_bgcolor:DK.SURF,plot_bgcolor:DK.SURF,
+    font:{family:"system-ui,-apple-system,sans-serif",size:11,color:DK.INK2},
+    xaxis:{gridcolor:DK.GRID,zeroline:false,title:{text:xt,font:{size:11}}},
+    yaxis:{gridcolor:DK.GRID,zeroline:false,title:{text:yt,font:{size:11}}},
+    legend:{orientation:"h",y:1.13,x:0.5,xanchor:"center",font:{size:10.5}},showlegend:true},extra||{});
+  const CFG={displayModeBar:false,responsive:true};
+
+  // Fig 3: smiles with date chips
+  const smileDates=Object.keys(rn);
+  const chipBox=document.getElementById("smileChips");
+  function drawSmile(d){
+    const s2=rn[d],m=s2.strikes.map((k,i)=>({k:k/s2.spot,mkt:s2.market_iv[i]*100,fit:s2.merton_iv[i]*100}))
+      .sort((a,b)=>a.k-b.k);
+    Plotly.react("chSmile",[
+      {x:m.map(o=>o.k),y:m.map(o=>o.mkt),mode:"markers",name:"market IV (OTM)",
+       marker:{color:DK.GREY,size:5,opacity:.65},
+       hovertemplate:"K/S %{x:.3f} · market %{y:.1f}%<extra></extra>"},
+      {x:m.map(o=>o.k),y:m.map(o=>o.fit),mode:"lines",name:"Merton fit",
+       line:{color:DK.BLUE,width:2.4},
+       hovertemplate:"K/S %{x:.3f} · Merton %{y:.1f}%<extra></extra>"},
+      {x:[Math.min(...m.map(o=>o.k)),Math.max(...m.map(o=>o.k))],
+       y:[s2.atm_iv*100,s2.atm_iv*100],mode:"lines",name:"flat Black–Scholes (ATM IV)",
+       line:{color:DK.ORANGE,width:1.8,dash:"dash"},hoverinfo:"skip"}],
+      lay(`${d} · ${s2.dte} DTE · Merton: λ=${f(s2.merton_params.lam,2)}/yr, μJ=${f(s2.merton_params.mu_j)}, RMSE ${f(s2.rmse_iv*100,2)} vol pts`,
+          "moneyness K/S","implied vol (%)"),CFG);
+    chipBox.querySelectorAll(".chip").forEach(c=>c.classList.toggle("active",c.dataset.d===d));
+  }
+  chipBox.innerHTML=smileDates.map(d=>
+    `<button class="chip" data-d="${d}">${d} — ${rn[d].label}</button>`).join("");
+  chipBox.querySelectorAll(".chip").forEach(c=>c.addEventListener("click",()=>drawSmile(c.dataset.d)));
+  drawSmile("2020-03-16");
+
+  // Fig 4: equity curves with scenario chips
+  const eqBox=document.getElementById("eqChips");
+  const scen={matched:"Matched — BS in GBM world",steamroller:"Steamroller — BS in jump world",
+              right_model:"Right model — Merton in jump world",overcautious:"Overcautious — Merton in GBM world"};
+  function drawEq(k){
+    const c=desk[k].curves[0];
+    Plotly.react("chEq",[
+      {x:c.t,y:c.realized,mode:"lines",name:"realised P/L",line:{color:DK.BLUE,width:2.4},
+       hovertemplate:"t=%{x:.2f}y · realised %{y:,.1f}$<extra></extra>"},
+      {x:c.t,y:c.exp_model,mode:"lines",name:"edge desk believes",line:{color:DK.AQUA,width:2,dash:"dash"},
+       hovertemplate:"t=%{x:.2f}y · believed %{y:,.1f}$<extra></extra>"},
+      {x:c.t,y:c.exp_truth,mode:"lines",name:"true expected edge",line:{color:DK.ORANGE,width:2,dash:"dash"},
+       hovertemplate:"t=%{x:.2f}y · truth %{y:,.1f}$<extra></extra>"}],
+      lay(scen[k]+` · seed ${c.seed}`,"time (years)","cumulative P/L ($)"),CFG);
+    eqBox.querySelectorAll(".chip").forEach(c2=>c2.classList.toggle("active",c2.dataset.k===k));
+  }
+  eqBox.innerHTML=Object.entries(scen).map(([k,v])=>
+    `<button class="chip" data-k="${k}">${v.split(" — ")[0]}</button>`).join("");
+  eqBox.querySelectorAll(".chip").forEach(c=>c.addEventListener("click",()=>drawEq(c.dataset.k)));
+  drawEq("steamroller");
+
+  // Fig 6: breakeven
+  const be=await j("breakeven.json");
+  Plotly.newPlot("chBe",[
+    {x:be.matched.spreads,y:be.matched.prob_loss.map(p=>p*100),mode:"lines+markers",
+     name:"matched model",line:{color:DK.BLUE,width:2.4},marker:{size:5},
+     hovertemplate:"s=$%{x:.3f} · P(loss) %{y:.1f}%<extra></extra>"},
+    {x:be.steamroller.spreads,y:be.steamroller.prob_loss.map(p=>p*100),mode:"lines+markers",
+     name:"mispriced desk",line:{color:DK.RED,width:2.4},marker:{size:5},
+     hovertemplate:"s=$%{x:.2f} · P(loss) %{y:.1f}%<extra></extra>"},
+    {x:[0.02,16],y:[5,5],mode:"lines",name:"5% target",
+     line:{color:DK.GREY,width:1.2,dash:"dash"},hoverinfo:"skip"}],
+    lay("What spread buys safety? (log x)","quoted half-spread ($)","P(one-year P/L < 0) %",
+        {xaxis:{type:"log",gridcolor:DK.GRID,title:{text:"quoted half-spread ($, log)",font:{size:11}}}}),CFG);
+
 }catch(e){document.getElementById("fetchNote").style.display="block";}})();
 </script>
 
 </div>
 
 <footer><div class="foot-inner">
-  <div>model-risk-lab · built by <b>Arijit Ray</b></div>
-  <div><a href="https://github.com/Arijitray2/model-risk-lab">source &amp; data on github</a></div>
+  <div>model-risk-lab · built by <b>Arijit Ray</b> · <a href="mailto:ray.asokekumar@gmail.com">ray.asokekumar@gmail.com</a></div>
+  <div><a href="https://github.com/Arijitray2/model-risk-lab">source &amp; data on github</a> · press <kbd class="kbd">Ctrl</kbd>+<kbd class="kbd">K</kbd></div>
 </div></footer>
 
 <script src="assets/ui.js"></script>

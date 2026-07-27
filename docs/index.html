@@ -69,6 +69,7 @@
     <a class="btn primary" href="demo.html">▶ run the full simulator</a>
     <a class="btn ghost" href="methodology.html">read the math</a>
     <a class="btn ghost" href="report/model_risk_lab_report.pdf">24-page report (PDF)</a>
+    <button class="btn ghost" id="tourBtn">⚡ 60-sec tour</button>
   </div>
 </section>
 
@@ -164,7 +165,7 @@
   <h2 class="term"><span class="prompt">$</span><span>diff </span><span class="flag">belief reality</span></h2>
   <p class="sub">Same desk, same spread, same clients. Only the model assumption differs.</p>
   <figure class="fig">
-    <img src="assets/figures/fig4_equity.svg" alt="Equity curves: matched model desk earns the spread; mispriced desk believes it is profitable while losing heavily">
+    <img loading="lazy" src="assets/figures/fig4_equity.svg" alt="Equity curves: matched model desk earns the spread; mispriced desk believes it is profitable while losing heavily">
     <figcaption><b>Left:</b> when the pricing model matches reality, realised P/L (blue)
     climbs along the promised spread income (dashed). <b>Right:</b> pricing
     Black–Scholes while the world jumps — the desk's own model reports steady profit
@@ -216,12 +217,16 @@
     client flow, discrete hedging — deliberately simple so that every dollar of P/L is
     attributable. Research/learning project, not trading advice.
   </div>
+  <div class="ci-strip">
+    <img src="https://github.com/Arijitray2/model-risk-lab/actions/workflows/tests.yml/badge.svg" alt="tests status" onerror="this.style.display='none'">
+    <span>verified reproducible — the full unit-test suite runs on every push (GitHub Actions) · seeds fixed · <a href="https://github.com/Arijitray2/model-risk-lab/actions">see runs ↗</a></span>
+  </div>
 </section>
 
 </div>
 
 <footer><div class="foot-inner">
-  <div>model-risk-lab · built by <b>Arijit Ray</b></div>
+  <div>model-risk-lab · built by <b>Arijit Ray</b> · <a href="mailto:ray.asokekumar@gmail.com">ray.asokekumar@gmail.com</a></div>
   <div><a href="https://github.com/Arijitray2/model-risk-lab">source &amp; data on github</a> · press <kbd class="kbd">Ctrl</kbd>+<kbd class="kbd">K</kbd></div>
 </div></footer>
 
@@ -546,6 +551,58 @@ const REDUCE = matchMedia("(prefers-reduced-motion: reduce)").matches;
   }
   if (REDUCE){ render(1); }
   else { addEventListener("scroll", onScroll, { passive: true }); onScroll(); }
+})();
+
+/* ================= 60-second tour ================= */
+(function(){
+  const STEPS=[
+    {sel:".termwin",t:"the live experiment",h:"Two desks, one market",
+     p:"Both desks are quoted the exact same random market — same jumps, same clients. Green prices with the right model, red with Black–Scholes. Watch red's P/L: that's model risk happening in real time."},
+    {sel:".grid.c4",t:"the evidence",h:"Four numbers that carry the project",
+     p:"GBM is rejected on 17 years of data (LR=1627 vs a critical value of 7.8). The correct desk earns exactly what it quotes. The wrong desk loses 68× what it thinks it earns — and no spread below $15 saves it."},
+    {sel:"#story .story-frame",t:"the mechanism",h:"Why it happens",
+     p:"Scroll through three acts after the tour: the smooth world Black–Scholes assumes, the gapping world that actually exists (calibrated to the real COVID option chain), and the desk's books tearing away from its cash."},
+    {sel:".grid.c3",t:"go deeper",h:"Everything is open",
+     p:"Run the full simulator yourself, read every equation from scratch, poke the interactive results — or read the code. All data is real, every number regenerates from two scripts."}];
+  let i=0,dim,hole,card,active=false;
+  function ensure(){
+    if(dim)return;
+    dim=document.createElement("div");dim.id="tourdim";dim.innerHTML='<div id="tourhole"></div>';
+    card=document.createElement("div");card.id="tourcard";
+    document.body.append(dim,card);hole=document.getElementById("tourhole");
+  }
+  function place(){
+    const st=STEPS[i],el=document.querySelector(st.sel);if(!el)return end();
+    el.scrollIntoView({behavior:"smooth",block:"center"});
+    setTimeout(()=>{
+      const r=el.getBoundingClientRect();
+      hole.style.top=(r.top-8)+"px";hole.style.left=(r.left-8)+"px";
+      hole.style.width=(r.width+16)+"px";hole.style.height=(r.height+16)+"px";
+      card.innerHTML=`<div class="tstep">step ${i+1} / ${STEPS.length} — ${st.t}</div>
+        <h4>${st.h}</h4><p>${st.p}</p>
+        <div class="trow">
+          ${i>0?'<button class="btn ghost" id="tPrev">← back</button>':""}
+          <button class="btn primary" id="tNext">${i<STEPS.length-1?"next →":"finish — view source ↗"}</button>
+          <button class="skip" id="tSkip">esc to skip</button>
+        </div>`;
+      const below=r.bottom+250<innerHeight;
+      card.style.top=below?Math.min(r.bottom+18,innerHeight-240)+"px":"";
+      card.style.bottom=below?"":"24px";
+      card.style.left=Math.max(16,Math.min(r.left,innerWidth-400))+"px";
+      card.classList.add("on");
+      document.getElementById("tNext").onclick=()=>{ if(i<STEPS.length-1){i++;place();}
+        else{end();location.href="https://github.com/Arijitray2/model-risk-lab";} };
+      const pv=document.getElementById("tPrev");if(pv)pv.onclick=()=>{i--;place();};
+      document.getElementById("tSkip").onclick=end;
+    },480);
+  }
+  function start(){ensure();i=0;active=true;dim.classList.add("on");place();}
+  function end(){active=false;if(dim)dim.classList.remove("on");if(card)card.classList.remove("on");}
+  addEventListener("keydown",e=>{if(active&&e.key==="Escape")end();});
+  addEventListener("resize",()=>{if(active)place();});
+  window.__startTour=start;
+  document.getElementById("tourBtn").addEventListener("click",start);
+  if(location.hash==="#tour")setTimeout(start,2800);
 })();
 </script>
 

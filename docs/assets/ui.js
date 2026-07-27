@@ -90,6 +90,7 @@
     { t: "report — 24-page PDF", href: "report/model_risk_lab_report.pdf", k: "open" },
     { t: "source — github repository", href: "https://github.com/Arijitray2/model-risk-lab", k: "open" },
     { t: "inject market crash (overview page)", action: "crash", k: "run" },
+    { t: "start the 60-second tour", action: "tour", k: "run" },
   ];
   const root = document.createElement("div");
   root.id = "palette";
@@ -120,6 +121,9 @@
     if (it.action === "crash") {
       if (window.__injectCrash) window.__injectCrash();
       else location.href = "index.html#crash";
+    } else if (it.action === "tour") {
+      if (window.__startTour) window.__startTour();
+      else location.href = "index.html#tour";
     } else location.href = it.href;
   }
   addEventListener("keydown", (e) => {
@@ -153,4 +157,67 @@
       buf = "";
     }
   });
+})();
+
+/* ---------- reading progress bar ---------- */
+(function () {
+  const bar = document.createElement("div");
+  bar.id = "readbar";
+  document.body.appendChild(bar);
+  addEventListener("scroll", () => {
+    const h = document.documentElement;
+    const p = h.scrollTop / Math.max(h.scrollHeight - h.clientHeight, 1);
+    bar.style.width = (p * 100).toFixed(2) + "%";
+  }, { passive: true });
+})();
+
+/* ---------- data tape (real calibrated numbers) ---------- */
+(function () {
+  const nav = document.querySelector("nav");
+  if (!nav) return;
+  const ITEMS = [
+    'SPY 2008–2025 <b>n=4,504d</b>',
+    'GBM rejected <b class="b">LR=1627</b> (crit 7.8)',
+    'NIFTY 50 <b class="b">LR=1313</b>',
+    'physical jumps <b>λ̂=87.9/yr</b> μ̂J=−0.26%',
+    'COVID chain 2020-03-16 <b class="r">λ=3.68/yr · μJ=−31%</b>',
+    'matched desk edge <b class="g">+0.153</b> [0.146, 0.159]',
+    'mispriced desk edge <b class="r">−10.20</b> while books say +0.15',
+    'break-even spread <b class="g">8.8¢</b> vs <b class="r">&gt;$15</b>',
+    'VaR exceptions <b class="r">811/1500</b> (expected 75)',
+    'CUSUM alarm <b class="g">trade 83 of 1,467</b>',
+    'smile fit RMSE <b>0.67–1.27 vol pts</b>',
+    '15/15 unit tests <b class="g">passing</b>',
+  ];
+  const half = ITEMS.map(t => `<span>${t}</span>`).join("");
+  const tape = document.createElement("div");
+  tape.className = "tape";
+  tape.innerHTML = `<div class="tape-inner">${half}${half}</div>`;
+  nav.insertAdjacentElement("afterend", tape);
+})();
+
+/* ---------- methodology TOC + scroll-spy ---------- */
+(function () {
+  const toc = document.getElementById("toc");
+  if (!toc) return;
+  const heads = [...document.querySelectorAll(".mcontent h2, .mcontent h3")];
+  let html = '<div class="tl">on this page</div>';
+  heads.forEach((h, i) => {
+    if (!h.id) h.id = "s" + i;
+    const txt = h.textContent.replace(/\s+/g, " ").trim();
+    html += `<a href="#${h.id}" class="${h.tagName === "H3" ? "h3" : ""}" data-t="${h.id}">${txt}</a>`;
+  });
+  toc.innerHTML = html;
+  const links = new Map([...toc.querySelectorAll("a")].map(a => [a.dataset.t, a]));
+  const io = new IntersectionObserver((es) => {
+    es.forEach(e => {
+      if (e.isIntersecting) {
+        links.forEach(a => a.classList.remove("on"));
+        const a = links.get(e.target.id);
+        if (a) { a.classList.add("on");
+          a.scrollIntoView({ block: "nearest" }); }
+      }
+    });
+  }, { rootMargin: "-72px 0px -74% 0px" });
+  heads.forEach(h => io.observe(h));
 })();
