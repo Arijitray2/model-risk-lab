@@ -1,13 +1,12 @@
 \documentclass[11pt,a4paper]{article}
 
-\usepackage[margin=2.6cm]{geometry}
+\usepackage[margin=2.5cm]{geometry}
 \usepackage{amsmath,amssymb}
 \usepackage{graphicx}
 \usepackage{booktabs}
 \usepackage{xcolor}
 \usepackage{mathpazo}
 \usepackage[T1]{fontenc}
-%\usepackage{microtype}
 \usepackage{enumitem}
 \usepackage[colorlinks=true, linkcolor=linkblue, urlcolor=linkblue, citecolor=linkblue]{hyperref}
 \usepackage{caption}
@@ -15,25 +14,34 @@
 
 \definecolor{linkblue}{HTML}{1C5CAB}
 \definecolor{accent}{HTML}{2A78D6}
-\definecolor{inkgray}{HTML}{52514E}
 \definecolor{boxbg}{HTML}{F4F6FA}
+\definecolor{obsbg}{HTML}{F3F9F4}
+\definecolor{obsline}{HTML}{1BAF7A}
 
 \newcommand{\E}{\mathbb{E}}
 \newcommand{\Prob}{\mathbb{P}}
 \newcommand{\Var}{\mathrm{Var}}
 \newcommand{\dd}{\,\mathrm{d}}
+\newcommand{\N}{\mathcal{N}}
 
 \usepackage{mdframed}
 \newmdenv[backgroundcolor=boxbg, linecolor=accent, linewidth=1.5pt,
   topline=false, bottomline=false, rightline=false,
   innertopmargin=8pt, innerbottommargin=8pt]{keybox}
+\newmdenv[backgroundcolor=obsbg, linecolor=obsline, linewidth=1.5pt,
+  topline=false, bottomline=false, rightline=false,
+  innertopmargin=8pt, innerbottommargin=8pt]{obsbox}
 
-\title{\vspace{-1.2cm}\textbf{Model Risk Lab}\\[4pt]
+\setcounter{tocdepth}{2}
+
+\title{\vspace{-1.4cm}\textbf{Model Risk Lab}\\[4pt]
 \Large What a Wrong Pricing Model Costs an Options Desk --- in Dollars\\[6pt]
-\normalsize A market-making simulator calibrated to real SPY and NIFTY~50 data,\\
-with a complete statistical model-validation suite}
-\author{Arijit Ray \\ \small MSc Statistics, IIT Bombay \\
-\small \texttt{github.com/Arijitray2/model-risk-lab}}
+\normalsize A complete, from-scratch account: every model, every estimator, every
+test, every observation.\\
+Calibrated to real SPY and NIFTY~50 market data.}
+\author{Arijit Ray\\ \small MSc Statistics, IIT Bombay\\
+\small \texttt{github.com/Arijitray2/model-risk-lab} \,$\cdot$\,
+\texttt{arijitray2.github.io/model-risk-lab}}
 \date{\today}
 
 \begin{document}
@@ -41,228 +49,523 @@ with a complete statistical model-validation suite}
 
 \begin{abstract}
 \noindent
-A market maker earns the bid--ask spread by quoting around \emph{fair value} --- but
-fair value comes from a model, and the model can be wrong. This project measures that
-danger end to end. Geometric Brownian motion (GBM) and the Merton jump-diffusion are
-calibrated to 17+ years of SPY and NIFTY~50 daily returns by maximum likelihood
-(GBM is rejected with likelihood-ratio statistics of $\approx1627$ and $\approx1313$)
-and to four real SPY option chains --- on 16 March 2020 the options market priced
-$\lambda=3.7$ crashes per year with mean size $-31\%$. A simulated options desk then
-quotes a rolling three-month contract under four (true model, believed model)
-scenarios with price-elastic client flow. When the model matches reality the desk
-realises its quoted half-spread ($+0.153$ per contract against a promised $0.15$;
-bootstrap 95\% CI $[0.146,0.159]$). When it prices Black--Scholes in the jump world,
-it \emph{believes} it earns $+0.15$ while actually losing $10.20$ per contract, and
-no half-spread below \$15 (${>}170\times$ the matched desk's break-even of
-8.8~cents) makes it 95\%-safe. Finally, a validation suite --- Kupiec and
-Christoffersen VaR backtests, bootstrap edge inference, and a CUSUM monitor ---
-detects the broken model from realised P/L alone, raising an alarm at trade 83 of
-1{,}467 with zero false alarms on the correctly-specified desk. All data, code,
-figures and an interactive browser demo are in the repository. The write-up assumes
-bachelor's-level probability and statistics; every model is stated with its
-equations, and every design choice is explained by what it does to the final number.
+A market maker earns the bid--ask spread by quoting around \emph{fair value} ---
+but fair value comes from a model, and the model can be wrong. This document is a
+self-contained account of a project that measures the cost of that error in
+dollars and then detects it statistically. It is written for a reader with
+bachelor's-level mathematics and statistics and assumes nothing beyond that:
+Brownian motion, the Poisson process, It\^o's lemma, option pricing,
+maximum-likelihood theory, the likelihood-ratio/AIC/BIC machinery, Value-at-Risk
+and Expected Shortfall, the Kupiec and Christoffersen backtests, the bootstrap and
+the CUSUM monitor are each built up from first principles before they are used.
+Headline findings: on 17+ years of SPY and NIFTY~50 daily returns the Gaussian
+(Black--Scholes) model is rejected against the Merton jump-diffusion with
+likelihood-ratio statistics of $\approx 1627$ and $\approx 1313$; on 16 March 2020
+the SPY options market priced $3.7$ crashes per year of average size $-31\%$; a
+simulated desk that prices with the matched model realises $+0.153$ per contract
+against a promised $0.15$ (bootstrap 95\% CI $[0.146,0.159]$), while the same desk
+pricing Black--Scholes in the jump world \emph{believes} $+0.15$ and realises
+$-10.20$; no half-spread below \$15 makes the wrong-model desk 95\%-safe, versus
+8.8 cents for the right one; and a validation suite catches the broken model at
+trade 83 of 1{,}467 with zero false alarms on the healthy desk.
 \end{abstract}
 
 \tableofcontents
+\newpage
 
-%=====================================================================
-\section{Introduction: the business of quoting, and its hidden bet}
+%######################################################################
+\part{Foundations}
+\label{part:foundations}
 
-\subsection{What a market maker does}
-An options market maker continuously posts two prices for the same contract: a
-\textbf{bid} at which it will buy and an \textbf{ask} at which it will sell. If the
-option's fair value is $V$ and the desk quotes
+The whole project rests on a small set of probabilistic and statistical ideas.
+This part builds them from scratch so that nothing later has to be taken on faith.
+
+%======================================================================
+\section{Random variables, moments, and why tails matter}
+
+\subsection{Expectation, variance, and higher moments}
+A random variable $X$ has expectation (mean) $\E[X]$, the probability-weighted
+average of its outcomes, and variance
 \begin{equation}
-\text{bid} = V - s, \qquad \text{ask} = V + s,
+\Var(X)=\E\big[(X-\E X)^2\big],\qquad \text{sd}(X)=\sigma_X=\sqrt{\Var(X)} .
 \end{equation}
-then every client trade hands the desk $+s$ of expected profit (the
-\emph{half-spread}): it sells above fair value and buys below it. Volume times $s$ is
-the revenue of the business. This is real: option markets are quote-driven, and
-market-making firms exist on exactly this economics.
+Mean and variance describe location and spread, but two distributions can share
+both and still be utterly different \emph{in the tails} --- and finance lives and
+dies in the tails. Two standardised moments capture the difference. Writing
+$Z=(X-\E X)/\sigma_X$:
+\begin{equation}
+\text{skewness}=\E[Z^3],\qquad
+\text{excess kurtosis}=\E[Z^4]-3 .
+\end{equation}
+Skewness measures asymmetry (negative skew: the long tail is on the loss side).
+Excess kurtosis measures tail weight relative to the normal distribution, whose
+$\E[Z^4]$ is exactly 3 --- hence the ``$-3$''. Daily equity returns typically show
+negative skew and large positive excess kurtosis; a Gaussian has zero of both.
 
-\subsection{The hidden bet}
-The catch is the symbol $V$. Nobody hands the desk fair value; it must be
-\emph{computed from a model} of how the underlying asset moves. The desk's entire
-P/L statement therefore rests on a modelling assumption that could be wrong. The
-purpose of this project is to make the consequences of that assumption
-\textbf{visible, measurable, and statistically testable}:
+\subsection{The normal distribution and the size of its tails}
+The normal (Gaussian) law $\N(\mu,\sigma^2)$ has density
+\begin{equation}
+\varphi(x;\mu,\sigma^2)=\frac{1}{\sigma\sqrt{2\pi}}
+\exp\!\Big[-\frac{(x-\mu)^2}{2\sigma^2}\Big].
+\end{equation}
+It appears everywhere because of the \textbf{central limit theorem}: sums of many
+small independent shocks are approximately Gaussian. That is exactly the logic
+behind Gaussian models of returns --- a day's return is the sum of thousands of
+small trades. The logic fails when \emph{one} shock is occasionally enormous
+(a crash): then the sum is dominated by a single term and the CLT approximation
+breaks in the tails. How thin are Gaussian tails? For $Z\sim\N(0,1)$:
+\begin{center}
+\small
+\begin{tabular}{lccccc}
+\toprule
+$k$ & 2 & 3 & 5 & 7 & 9\\
+$\Prob(Z<-k)$ & $2.3\times10^{-2}$ & $1.3\times10^{-3}$ & $2.9\times10^{-7}$
+& $1.3\times10^{-12}$ & $1.1\times10^{-19}$\\
+``once every'' & 2 months & 3 years & 13{,}000 yrs & $3\times10^{9}$ yrs &
+$3\times10^{16}$ yrs\\
+\bottomrule
+\end{tabular}
+\end{center}
+(``once every'' converts the probability to trading days.) Keep this table in
+mind: Section~\ref{sec:physobs} shows SPY's worst in-sample day is a
+$\approx\!9\sigma$ event under the fitted Gaussian --- an event that model says
+should not happen in the age of the universe, yet it is right there in the data.
+
+%======================================================================
+\section{Brownian motion}
+\label{sec:bm}
+
+\subsection{From coin flips to a continuous process}
+Take a symmetric random walk: every time step $\Delta t$, move up or down by
+$\sqrt{\Delta t}$ with probability $\tfrac12$ each. Over time $t$ there are
+$t/\Delta t$ steps, so the position has mean 0 and variance
+$(t/\Delta t)\cdot\Delta t=t$. Letting $\Delta t\to0$, the CLT turns the position
+at time $t$ into a Gaussian $\N(0,t)$, and the limiting object is
+\textbf{Brownian motion} $W_t$, characterised by:
 \begin{enumerate}[itemsep=1pt]
-  \item \textbf{Calibrate} two competing models --- Black--Scholes/GBM and Merton
-    jump-diffusion --- to real market data, with standard errors and formal model
-    comparison (Section~\ref{sec:physical}--\ref{sec:rn}).
-  \item \textbf{Simulate} a market-making desk that believes one model while the
-    world follows another (Section~\ref{sec:desk}).
-  \item \textbf{Measure} the damage in the units risk managers use: VaR, Expected
-    Shortfall, drawdowns, and a break-even spread --- a dollar
-    \emph{model-risk premium} (Section~\ref{sec:risk}).
-  \item \textbf{Validate}: treat the desk's model as a hypothesis and reject it
-    from realised P/L alone, using the same tests a bank's model-risk management
-    (MRM) team runs --- Kupiec, Christoffersen, bootstrap, CUSUM
-    (Section~\ref{sec:validation}).
+\item $W_0=0$;
+\item independent increments: $W_t-W_s$ is independent of everything up to $s$;
+\item Gaussian increments: $W_t-W_s\sim\N(0,\,t-s)$;
+\item continuous paths.
 \end{enumerate}
 
-\begin{keybox}
-\textbf{The one-sentence result.} A desk that prices Black--Scholes in a world with
-COVID-sized jumps books $+0.15$ of ``edge'' per contract in its own accounting while
-truly earning $-10.20$; statistical monitoring catches the lie within weeks, and no
-commercially meaningful spread makes the wrong model safe.
-\end{keybox}
-
-\subsection{Origin and what is new here}
-The seed of this project is a teaching simulator by Roman Paolucci (Quant Guild),
-which demonstrates spread capture vs.\ model risk with assumed parameters and
-price-blind client flow. This project rebuilds the idea as a statistics project:
-all parameters are \emph{estimated} from real data with quantified uncertainty;
-client flow is \emph{price-elastic} (mispricing attracts informed flow instead of
-being ignored); the desk quotes a \emph{rolling constant-moneyness} contract so its
-economics are stationary; and the headline contribution is the \emph{validation
-layer} --- the machinery for detecting a wrong model from outcomes, which is the
-day job of model validation quants.
-
-%=====================================================================
-\section{Data}
-\label{sec:data}
-
-\begin{itemize}[itemsep=2pt]
-  \item \textbf{SPY daily OHLC, 1999--2025} (6{,}570 days). The S\&P~500 ETF ---
-    the most liquid equity underlying in the world.
-  \item \textbf{NIFTY 50 daily OHLC, 2007--2026} (4{,}554 days). India's headline
-    index, so both a developed and an emerging market are represented.
-  \item \textbf{SPY end-of-day option chains, 2008--2025} (24.7M quotes in the raw
-    mirror). The repository ships (i) a month-end panel of near-90-day-to-expiry
-    chains --- 216 dates, ${\sim}145{,}000$ quotes with bid/ask, open interest and
-    exchange-computed implied volatilities --- and (ii) four full-surface snapshots:
-    2017-01-03 (calm), 2020-03-16 (COVID crash, VIX~82), 2022-06-13 (bear market),
-    2025-06-30 (recent).
-  \item \textbf{US risk-free rate series} for discounting choices.
-\end{itemize}
-Sources are public GitHub mirrors, documented with URLs and licenses in
-\texttt{data/README.md}; a \texttt{scripts/fetch\_data.py} refreshes everything from
-the user's own machine. Calibration uses log-returns $x_i = \ln(S_i/S_{i-1})$ at
-$\Delta t = 1/252$ years.
-
-%=====================================================================
-\section{Two models of price motion}
-\label{sec:models}
-
-\subsection{Geometric Brownian motion --- the Black--Scholes world}
-\textbf{What.} The stochastic differential equation
+\subsection{The one strange rule: \texorpdfstring{$(\dd W)^2=\dd t$}{(dW)\texttwosuperior{} = dt}}
+Over a short interval $\dd t$ the increment $\dd W$ has standard deviation
+$\sqrt{\dd t}$, which is \emph{much larger} than $\dd t$ itself when $\dd t$ is
+small. Consequently the squared increment $(\dd W)^2$ has mean $\dd t$ and
+negligible variance around it: to first order in $\dd t$,
 \begin{equation}
-\dd S_t=\mu S_t \dd t+\sigma S_t \dd W_t
-\label{eq:gbm}
+(\dd W)^2 = \dd t \qquad\text{(the quadratic-variation rule).}
+\label{eq:qv}
 \end{equation}
-says returns have a constant expected growth rate $\mu$ and constant volatility
-$\sigma$, driven by Brownian motion $W_t$. By It\^o's lemma, log-returns over
-$\Delta t$ are i.i.d.\ Gaussian:
+This is the single fact that makes stochastic calculus different from ordinary
+calculus, and it is the origin of every ``$\tfrac12\sigma^2$'' term below.
+
+\subsection{It\^o's lemma}
+Let $X_t$ follow $\dd X=a\,\dd t+b\,\dd W$ and let $f(x)$ be smooth. A Taylor
+expansion of $f(X_{t+\dd t})$ keeps terms up to second order, because by
+\eqref{eq:qv} the second-order term $(\dd X)^2=b^2\dd t$ is \emph{first order in
+time}:
 \begin{equation}
-\ln\frac{S_{t+\Delta t}}{S_t}\;\sim\;
-\mathcal N\!\Big(\big(\mu-\tfrac12\sigma^2\big)\Delta t,\; \sigma^2\Delta t\Big).
-\label{eq:gbmreturns}
+\dd f
+= f'(X)\,\dd X+\tfrac12 f''(X)\,(\dd X)^2
+= \Big(a f'(X)+\tfrac12 b^2 f''(X)\Big)\dd t+b f'(X)\,\dd W .
+\label{eq:ito}
 \end{equation}
-\textbf{Why it matters.} GBM is the assumption inside the Black--Scholes formula.
-A desk that prices with Black--Scholes is betting that returns are Gaussian: no
-crashes, thin tails, and continuous paths that a delta hedge can follow.
+This is \textbf{It\^o's lemma} --- the chain rule with one extra term
+$\tfrac12 b^2 f''$, the price of infinitely wiggly paths.
 
-\subsection{Merton jump-diffusion --- a world that can gap}
-\textbf{What.} Merton (1976) superimposes crashes on the diffusion. Jumps arrive as
-a Poisson process $N_t$ with intensity $\lambda$ per year; each jump multiplies the
-price by $e^{Y}$, $Y\sim\mathcal N(\mu_J,\sigma_J^2)$:
+%======================================================================
+\section{The Poisson process}
+\label{sec:poisson}
+
+Crashes do not arrive on a schedule; they arrive \emph{at random times}. The
+canonical model for random arrivals is the \textbf{Poisson process} $N_t$ with
+intensity $\lambda$ (events per year):
+\begin{enumerate}[itemsep=1pt]
+\item $N_0=0$, and $N_t$ counts events up to time $t$;
+\item independent increments;
+\item in a short interval $\dd t$: exactly one event with probability
+  $\lambda\,\dd t$, more than one with probability negligible compared to
+  $\dd t$.
+\end{enumerate}
+From these axioms the count over any interval of length $t$ is Poisson
+distributed:
 \begin{equation}
-\frac{\dd S_t}{S_{t^-}}=(\mu-\lambda k)\dd t+\sigma \dd W_t+\big(e^{Y}-1\big)\dd N_t,
-\qquad k=\E[e^{Y}]-1=e^{\mu_J+\sigma_J^2/2}-1 .
-\label{eq:merton}
+\Prob(N_t=n)=e^{-\lambda t}\frac{(\lambda t)^n}{n!},\qquad
+\E[N_t]=\Var(N_t)=\lambda t .
+\label{eq:poispmf}
 \end{equation}
-The $-\lambda k \dd t$ \emph{compensator} recentres the process so that $\mu$
-remains the total expected growth rate --- without it, adding negative jumps would
-silently change the drift and the comparison between models would be unfair.
+Waiting times between events are exponential with mean $1/\lambda$ and
+memoryless: a market that has not crashed for five years is (in this model) no
+``safer'' than yesterday. Section~\ref{sec:merton} attaches a random \emph{size}
+to each arrival to build the jump part of the Merton model.
 
-\textbf{Why it matters.} A daily log-return under \eqref{eq:merton} is a
-\emph{Poisson mixture of Gaussians}: with probability
-$e^{-\lambda\Delta t}(\lambda\Delta t)^n/n!$ the day contains $n$ jumps, and
-conditionally the return is Gaussian with mean shifted by $n\mu_J$ and variance
-inflated by $n\sigma_J^2$. Mixing Gaussians of different variances is precisely
-what generates \textbf{fat tails and skew} --- the two features of real returns
-that Gaussians cannot produce.
+%######################################################################
+\part{Models of Price Motion and Option Pricing}
 
-%=====================================================================
-\section{Pricing under each model}
-\label{sec:pricing}
+%======================================================================
+\section{Geometric Brownian motion: the Black--Scholes world}
+\label{sec:gbm}
 
-\subsection{Black--Scholes}
-Under GBM with risk-free rate $r$ the European call price is
+\subsection{The model}
+The standard model for an asset price $S_t$ says that \emph{percentage} changes
+have constant drift and constant noise:
 \begin{equation}
-C_{BS}=S_0\Phi(d_1)-Ke^{-rT}\Phi(d_2),\qquad
-d_1=\frac{\ln(S_0/K)+(r+\sigma^2/2)T}{\sigma\sqrt T},\qquad d_2=d_1-\sigma\sqrt T,
+\dd S_t=\mu S_t\,\dd t+\sigma S_t\,\dd W_t .
+\label{eq:gbmsde}
+\end{equation}
+$\mu$ is the expected growth rate per year, $\sigma$ the volatility per year.
+Percentage (not absolute) changes, because a \$1 move means something different
+at $S=10$ than at $S=1000$.
+
+\subsection{Solving it, and the origin of \texorpdfstring{$-\tfrac12\sigma^2$}{-sigma\texttwosuperior/2}}
+Apply It\^o's lemma \eqref{eq:ito} to $f(S)=\ln S$ (so $f'=1/S$,
+$f''=-1/S^2$), with $a=\mu S$ and $b=\sigma S$:
+\begin{equation}
+\dd \ln S=\Big(\frac{\mu S}{S}-\tfrac12\frac{\sigma^2S^2}{S^2}\Big)\dd t
++\frac{\sigma S}{S}\dd W
+=\Big(\mu-\tfrac{\sigma^2}{2}\Big)\dd t+\sigma\,\dd W .
+\end{equation}
+Integrating from 0 to $t$:
+\begin{equation}
+S_t=S_0\exp\!\Big[\big(\mu-\tfrac{\sigma^2}{2}\big)t+\sigma W_t\Big],
+\qquad
+\ln\frac{S_{t+\Delta t}}{S_t}\sim
+\N\!\Big(\big(\mu-\tfrac{\sigma^2}{2}\big)\Delta t,\;\sigma^2\Delta t\Big).
+\label{eq:gbmsol}
+\end{equation}
+So under GBM, \textbf{daily log-returns are i.i.d.\ Gaussian}. That is the
+falsifiable statement the data will judge in Part~\ref{part:estimation}. The
+$-\sigma^2/2$ is not a convention; it is forced by It\^o's lemma and reflects
+the gap between the average of growth rates and the growth rate of the average.
+The simulator uses \eqref{eq:gbmsol} directly (the ``exact log-Euler'' step), so
+path simulation carries no discretisation error.
+
+\subsection{What GBM asserts about the world}
+No jumps (paths are continuous); constant volatility; Gaussian tails (recall the
+tail table in \S1.2); returns independent day to day. Each assertion can fail in
+reality; this project focuses on the most dangerous failure for an options desk
+--- the missing jumps --- because a delta hedge can, in principle, track a
+continuous path but can \emph{never} track a gap.
+
+%======================================================================
+\section{The Merton jump-diffusion: a world that can gap}
+\label{sec:merton}
+
+\subsection{Construction}
+Superimpose on GBM a stream of jumps: arrivals from a Poisson process $N_t$ with
+intensity $\lambda$ (\S\ref{sec:poisson}); at each arrival the price is
+multiplied by $e^{Y}$ with $Y\sim\N(\mu_J,\sigma_J^2)$ drawn independently.
+Between jumps the price diffuses as GBM. The SDE is
+\begin{equation}
+\frac{\dd S_t}{S_{t^-}}
+=(\mu-\lambda k)\,\dd t+\sigma\,\dd W_t+\big(e^{Y}-1\big)\dd N_t ,
+\qquad
+k=\E\big[e^{Y}\big]-1=e^{\mu_J+\sigma_J^2/2}-1 .
+\label{eq:mertonsde}
+\end{equation}
+The value of $k$ uses the lognormal-mean identity
+$\E[e^{Y}]=e^{\mu_J+\sigma_J^2/2}$ for Gaussian $Y$ --- a computation worth doing
+once by completing the square in
+$\int e^{y}\varphi(y;\mu_J,\sigma_J^2)\dd y$.
+
+\textbf{The compensator.} Jumps with negative mean would drag the expected
+growth rate below $\mu$; the term $-\lambda k\,\dd t$ (the \emph{compensator})
+subtracts the expected jump contribution so $\mu$ remains the total expected
+growth rate. Without it, comparing ``GBM with drift $\mu$'' against ``Merton
+with drift $\mu$'' would compare two different expected returns and the desk
+experiments would be confounded.
+
+\subsection{The distribution of a daily return: a Poisson mixture of Gaussians}
+Condition on the number of jumps $n$ in the day. Given $n$, the log-return is
+Gaussian --- diffusion contributes mean $(\mu-\sigma^2/2-\lambda k)\Delta t$ and
+variance $\sigma^2\Delta t$; the $n$ i.i.d.\ jump sizes add mean $n\mu_J$ and
+variance $n\sigma_J^2$. Weighting by the Poisson probabilities
+\eqref{eq:poispmf}:
+\begin{equation}
+f(x)=\sum_{n=0}^{\infty}e^{-\lambda\Delta t}\frac{(\lambda\Delta t)^n}{n!}\;
+\varphi\!\Big(x;\;\big(\mu-\tfrac{\sigma^2}{2}-\lambda k\big)\Delta t+n\mu_J,\;
+\sigma^2\Delta t+n\sigma_J^2\Big).
+\label{eq:mertondensity}
+\end{equation}
+A \textbf{mixture of Gaussians with different variances is not Gaussian}: the
+high-variance components dominate far from the centre, producing fat tails, and
+$\mu_J<0$ shifts those components left, producing negative skew. This is the
+entire mechanism by which the extra parameters $(\lambda,\mu_J,\sigma_J)$ buy
+realistic tails.
+
+%======================================================================
+\section{Options and arbitrage-free pricing}
+\label{sec:options}
+
+\subsection{Contracts and payoffs}
+A \textbf{European call} with strike $K$ and expiry $T$ pays
+$\max(S_T-K,0)$; a \textbf{put} pays $\max(K-S_T,0)$. A put is crash
+insurance: it pays exactly when the market has fallen below $K$. ``Moneyness''
+$K/S$ locates the strike relative to spot (an at-the-money (ATM) option has
+$K\approx S$; an out-of-the-money (OTM) put has $K<S$).
+
+\subsection{No-arbitrage and put--call parity}
+An \textbf{arbitrage} is a free lunch --- a trade with no initial cost, no risk
+of loss, and positive probability of gain. Pricing proceeds by ruling these
+out. The cleanest example: hold (long call, short put, same $K,T$). At expiry
+this pays $\max(S_T-K,0)-\max(K-S_T,0)=S_T-K$ in every state. A position paying
+$S_T-K$ for sure must cost its discounted certain value today:
+\begin{equation}
+C-P=S_0-Ke^{-rT}
+\qquad\text{(put--call parity)},
+\label{eq:parity}
+\end{equation}
+where $r$ is the risk-free interest rate. Parity is model-free --- it holds no
+matter how $S$ moves --- which makes it a perfect \emph{unit test}: our pricer
+satisfies it to $10^{-10}$.
+
+\subsection{Delta hedging and the Black--Scholes argument}
+Why does a \emph{model} give a unique price at all? Black and Scholes's insight:
+under GBM the option's risk can be \emph{eliminated} by trading the underlying.
+Let $V(S,t)$ be the option value. By It\^o's lemma,
+\begin{equation}
+\dd V=\Big(V_t+\mu S V_S+\tfrac12\sigma^2S^2V_{SS}\Big)\dd t
++\sigma S V_S\,\dd W .
+\end{equation}
+Form a portfolio: long the option, short $\Delta=V_S$ shares. Its change is
+$\dd V-V_S\,\dd S$, and the $\dd W$ terms \emph{cancel exactly}:
+\begin{equation}
+\dd V - V_S\dd S=\Big(V_t+\tfrac12\sigma^2S^2V_{SS}\Big)\dd t .
+\end{equation}
+A riskless portfolio must earn the risk-free rate $r$ (else arbitrage), giving
+the \textbf{Black--Scholes PDE}
+\begin{equation}
+V_t+\tfrac12\sigma^2S^2V_{SS}+rSV_S-rV=0 ,
+\label{eq:bspde}
+\end{equation}
+whose solution with terminal condition $\max(S-K,0)$ is the
+\textbf{Black--Scholes formula}
+\begin{equation}
+C_{BS}=S_0\Phi(d_1)-Ke^{-rT}\Phi(d_2),\quad
+d_1=\frac{\ln(S_0/K)+(r+\sigma^2/2)T}{\sigma\sqrt T},\quad
+d_2=d_1-\sigma\sqrt T ,
 \label{eq:bs}
 \end{equation}
-with $\Phi$ the standard normal CDF; puts follow by put--call parity
-($C-P=S_0-Ke^{-rT}$, verified in unit tests to $10^{-10}$). The hedge ratio is
-$\Delta_{\text{call}}=\Phi(d_1)$, $\Delta_{\text{put}}=\Phi(d_1)-1$.
+$\Phi$ the standard normal CDF; the put follows from parity \eqref{eq:parity}.
+Two facts to notice. \emph{First}, $\mu$ has vanished: because the hedge removes
+directional risk, the price cannot depend on expected return --- only on
+volatility. \emph{Second}, the argument needs continuous paths (to rebalance
+$\Delta$ continuously) and a known constant $\sigma$; both fail in a jump world,
+which is precisely the vulnerability this project quantifies. The hedge ratios
+used throughout are $\Delta_{\text{call}}=\Phi(d_1)$,
+$\Delta_{\text{put}}=\Phi(d_1)-1$, and
+``vega'' $=\partial V/\partial\sigma=S\sqrt{T}\,\varphi(d_1)$ (needed in
+\S\ref{sec:rncalib}).
 
-\subsection{Merton: a Poisson-weighted average of Black--Scholes prices}
-Conditional on $n$ jumps during the option's life the terminal log-price is still
-Gaussian, so the price is a mixture of Black--Scholes prices with jump-adjusted
-inputs:
+\subsection{Risk-neutral pricing in one paragraph}
+\label{sec:rn}
+The PDE argument is equivalent to a probabilistic recipe: price as if the world
+were risk-neutral --- replace $\mu$ by $r$ in the dynamics, then take the
+discounted expected payoff, $V=e^{-rT}\E^{\,Q}[\text{payoff}]$. The measure $Q$
+under which this works is called the \emph{risk-neutral measure}. The practical
+upshot used later: \textbf{option prices reveal the market's probabilistic
+model} (under $Q$) --- fitting a model to option prices recovers the dynamics
+the \emph{market} is pricing, as opposed to fitting returns, which recovers the
+dynamics the world actually follows (the \emph{physical} measure $P$).
+
+%======================================================================
+\section{Pricing under Merton: a series of Black--Scholes prices}
+\label{sec:mertonpricing}
+
+Under the risk-neutral Merton dynamics, condition on the number of jumps $n$
+during the option's life (probability
+$e^{-\lambda' T}(\lambda' T)^n/n!$ with $\lambda'=\lambda(1+k)$ --- the
+jump-size tilt $1+k$ arises from the measure change). Given $n$ jumps, the
+terminal log-price is Gaussian, so each conditional expectation is a
+Black--Scholes price with adjusted inputs, and the total price is the weighted
+sum --- \textbf{Merton's series}:
 \begin{equation}
-C_{M}=\sum_{n=0}^{\infty}\frac{e^{-\lambda' T}(\lambda' T)^n}{n!}\,
-C_{BS}\big(S_0,K,T;\,r_n,\sigma_n\big),\qquad \lambda'=\lambda(1+k),
-\label{eq:mertonprice}
-\end{equation}
-\begin{equation*}
-\sigma_n^2=\sigma^2+\frac{n\sigma_J^2}{T},\qquad
+C_M=\sum_{n=0}^{\infty}\frac{e^{-\lambda' T}(\lambda' T)^n}{n!}\,
+C_{BS}(S_0,K,T;\,r_n,\sigma_n),\qquad
+\sigma_n^2=\sigma^2+\frac{n\sigma_J^2}{T},\quad
 r_n=r-\lambda k+\frac{n(\mu_J+\sigma_J^2/2)}{T}.
-\end{equation*}
-The series is truncated at 60 terms; the neglected Poisson tail is below $10^{-40}$
-for all parameters used here. The Merton delta is the same weighted average of
-Black--Scholes deltas. \textbf{Impact:} because option payoffs are convex, the fat
-tails raise the price --- for identical diffusive $\sigma$, $C_M > C_{BS}$. That gap,
-evaluated at calibrated parameters, is the \emph{mispricing per contract} that a
-Black--Scholes desk gives away in a jump world.
+\label{eq:mertonseries}
+\end{equation}
+Interpretation of the adjustments: $n$ jumps add $n\sigma_J^2$ of log-variance
+(spread over the life $T$, hence the $/T$), and shift the risk-neutral growth by
+their total expected log-size, with the compensator $-\lambda k$ keeping the
+whole package arbitrage-free. Implementation truncates at 60 terms; since the
+weights are Poisson, the neglected tail is bounded by
+$\Prob(N>60)<10^{-40}$ for every parameter set used here. The Merton delta is
+the same weighted average of Black--Scholes deltas.
 
-%=====================================================================
-\section{Calibration I: the physical measure}
+\begin{keybox}
+\textbf{Why $C_M>C_{BS}$ at equal diffusive $\sigma$.} An option payoff is
+convex. By Jensen's inequality, spreading the terminal distribution wider (fat
+tails) raises the expected payoff. The dollar gap
+$C_M-C_{BS}$, evaluated at calibrated parameters, is the \emph{mispricing per
+contract} a Black--Scholes desk gives away in a jump world --- it will reappear
+in Part~\ref{part:desk} as roughly \$10 per contract.
+\end{keybox}
+
+\subsection{Implied volatility and the smile}
+\label{sec:iv}
+Quoting prices in dollars makes options with different strikes incomparable.
+The market convention is to quote each option by its \textbf{implied
+volatility}: the unique $\sigma$ that makes \eqref{eq:bs} reproduce the price
+(unique because the BS price is strictly increasing in $\sigma$; we invert
+numerically with Brent's root-finder, discarding quotes that violate
+no-arbitrage bounds). If the world were GBM, every strike would imply the
+\emph{same} $\sigma$: a flat line. Real markets display a \textbf{skew/smile}:
+OTM puts imply much higher volatilities. Under a jump model this is exactly
+what should happen --- crash risk inflates the value of low-strike puts
+specifically. The smile is thus a diagnostic plot for model error, read
+directly off market data in \S\ref{sec:rnobs}.
+
+%######################################################################
+\part{Estimation: Fitting the Models to Real Data}
+\label{part:estimation}
+
+%======================================================================
+\section{Statistical machinery from scratch}
+\label{sec:statmachinery}
+
+\subsection{Likelihood and maximum likelihood}
+Given data $x_1,\dots,x_n$ assumed i.i.d.\ from a density
+$f(x;\theta)$ with unknown parameter vector $\theta$, the \textbf{likelihood} is
+the joint density read as a function of $\theta$:
+\begin{equation}
+L(\theta)=\prod_{i=1}^n f(x_i;\theta),\qquad
+\ell(\theta)=\ln L(\theta)=\sum_{i=1}^n\ln f(x_i;\theta).
+\end{equation}
+The \textbf{maximum-likelihood estimator (MLE)} $\hat\theta$ maximises
+$\ell$: it is the parameter value under which the observed data were most
+probable. Under regularity conditions the MLE is consistent (converges to the
+truth) and asymptotically normal:
+\begin{equation}
+\hat\theta\;\approx\;\N\big(\theta,\; I(\theta)^{-1}\big),\qquad
+I(\theta)=-\E\Big[\frac{\partial^2\ell}{\partial\theta\,\partial\theta^{\top}}\Big]
+\quad\text{(Fisher information)}.
+\label{eq:mleasymp}
+\end{equation}
+In practice $I$ is estimated by the \emph{observed information} --- the negative
+Hessian of $\ell$ at $\hat\theta$, computed numerically --- and
+\textbf{standard errors} are the square roots of the diagonal of its inverse.
+Intuition: the information matrix measures how sharply peaked the likelihood is;
+a sharp peak means the data pin the parameter down tightly.
+
+\subsection{The delta method}
+If $\hat\theta$ has standard error $s$ and we report a transformation
+$g(\hat\theta)$, a first-order Taylor expansion gives
+\begin{equation}
+\text{se}\big(g(\hat\theta)\big)\approx|g'(\hat\theta)|\,s .
+\label{eq:delta}
+\end{equation}
+We use this twice: to convert SEs of (daily mean, daily variance) into SEs of
+annual $(\mu,\sigma)$, and to convert SEs of log-parameterised Merton
+parameters (positivity is enforced by optimising $\ln\sigma,\ln\lambda,
+\ln\sigma_J$) back to the natural scale.
+
+\subsection{Hypothesis tests, p-values, and the likelihood-ratio test}
+\label{sec:lrtest}
+A \textbf{hypothesis test} confronts a null hypothesis $H_0$ (e.g.\ ``GBM is
+the true model'') with data. A \emph{test statistic} is chosen whose
+distribution under $H_0$ is known; the \textbf{p-value} is the probability,
+if $H_0$ were true, of a statistic at least as extreme as observed. Small
+p-value $\Rightarrow$ the data are implausible under $H_0$ $\Rightarrow$ reject.
+Rejecting a true null (false alarm) is a \emph{type I error}, controlled at the
+significance level (5\% throughout); failing to reject a false null is a
+\emph{type II error}, controlled by test power.
+
+For \textbf{nested models} (the smaller obtained from the larger by fixing
+parameters --- here GBM = Merton with $\lambda=0$), \emph{Wilks's theorem} says
+that under $H_0$
+\begin{equation}
+LR=2\big(\ell_{\text{big}}-\ell_{\text{small}}\big)\;\sim\;\chi^2_d ,
+\label{eq:wilks}
+\end{equation}
+$d$ = number of restricted parameters (here $d=3$: $\lambda,\mu_J,\sigma_J$).
+The 95\% critical value of $\chi^2_3$ is 7.81.
+
+\textbf{A boundary caveat, stated honestly.} Wilks's theorem assumes the null
+lies in the \emph{interior} of the parameter space. Our null $\lambda=0$ sits on
+the boundary ($\lambda$ cannot be negative), and when $\lambda=0$ the jump-size
+parameters $\mu_J,\sigma_J$ become meaningless (unidentified). Both issues push
+the true null distribution of $LR$ \emph{below} $\chi^2_3$, so using
+$\chi^2_3$ is \emph{conservative}: it makes rejecting harder, not easier. With
+observed statistics above 1{,}300 against a critical value of 7.81, no
+correction could change the verdict --- but at small samples this caveat is the
+difference between careful and careless inference.
+
+\subsection{AIC and BIC}
+Adding parameters always increases the maximised likelihood; information
+criteria penalise the increase to prevent overfitting:
+\begin{equation}
+AIC=2k-2\ell,\qquad BIC=k\ln n-2\ell ,
+\end{equation}
+$k$ = number of parameters. Lower is better. BIC's penalty grows with sample
+size, making it the stricter criterion; a BIC difference above 10 is
+conventionally called ``decisive''. We report both alongside the LR test so the
+conclusion does not hinge on a single criterion.
+
+\subsection{QQ plots}
+A quantile--quantile plot is the visual counterpart of a goodness-of-fit test.
+Sort the data $x_{(1)}\le\dots\le x_{(n)}$; plot $x_{(i)}$ against the model
+quantile $F^{-1}\big((i-\tfrac12)/n\big)$. If the model is right the points lie
+on the 45° line; systematic S-shaped departures at the ends mean the model's
+tails are too thin. For Merton, $F^{-1}$ has no closed form; we compute the
+mixture CDF from \eqref{eq:mertondensity} on a fine grid and invert by
+interpolation.
+
+%======================================================================
+\section{Calibration I: the physical measure (what returns actually do)}
 \label{sec:physical}
 
-\subsection{GBM by closed-form maximum likelihood}
-With Gaussian log-returns, maximising the likelihood gives the sample mean
-$\hat m$ and (MLE) variance $\hat v$ of daily returns, mapped to annual units:
+\subsection{GBM: the MLE in closed form}
+By \eqref{eq:gbmsol}, daily log-returns are i.i.d.\
+$\N(m,v)$ with $m=(\mu-\sigma^2/2)\Delta t$, $v=\sigma^2\Delta t$. Setting
+$\partial\ell/\partial m=0$ and $\partial\ell/\partial v=0$ for the Gaussian
+log-likelihood yields the sample mean $\hat m$ and the (divide-by-$n$) sample
+variance $\hat v$; mapping back,
 \begin{equation}
 \hat\sigma=\sqrt{\hat v/\Delta t},\qquad
 \hat\mu=\frac{\hat m}{\Delta t}+\frac{\hat\sigma^2}{2}.
 \end{equation}
-Standard errors use the exact Gaussian Fisher information,
-$\Var(\hat m)=v/n$ and $\Var(\hat v)=2v^2/n$, propagated by the delta method.
-\textbf{An honest disclosure:} with $n\!\approx\!4{,}500$ days, $\hat\sigma$ is
-pinned to three decimals but $\hat\mu$ carries a standard error of ${\sim}4.5\%$
-\emph{per year} --- drift is nearly unlearnable from daily data. This is why the
-desk's P/L design leans on delta-hedged positions, whose expectation is
-drift-free (Section~\ref{sec:desk}).
+Exact Gaussian sampling theory gives $\Var(\hat m)=v/n$ and
+$\Var(\hat v)=2v^2/n$; the delta method \eqref{eq:delta} converts these to SEs
+for $\hat\mu,\hat\sigma$.
 
-\subsection{Merton by numerical maximum likelihood}
-The daily-return density is the truncated Poisson mixture
-\begin{equation}
-f(x)=\sum_{n=0}^{8}\frac{e^{-\lambda\Delta t}(\lambda\Delta t)^n}{n!}\,
-\varphi\!\Big(x;\;(\mu-\tfrac{\sigma^2}{2}-\lambda k)\Delta t+n\mu_J,\;
-\sigma^2\Delta t+n\sigma_J^2\Big),
-\label{eq:mertonlik}
-\end{equation}
-maximised over $(\mu,\sigma,\lambda,\mu_J,\sigma_J)$ with positivity enforced by
-log-parameterisation. Because jumps and diffusion can partially trade off, the
-likelihood is multi-modal: we use multi-start Nelder--Mead followed by BFGS
-polishing. Standard errors come from the \emph{observed information} --- the inverse
-of the numerically-differentiated Hessian of $-\ln L$ at the optimum --- mapped
-through the log-links by the delta method. The estimator is verified on synthetic
-data (parameters recovered within sampling error) before touching real returns.
+\begin{obsbox}
+\textbf{Observation (drift is unlearnable).} With $n\approx4{,}500$ days,
+$\hat\sigma$ carries an SE of $\pm0.002$ --- three-decimal precision --- while
+$\hat\mu$ carries an SE of $\pm4.5\%$ \emph{per year}, the same order as the
+estimate itself. Two decades of daily data cannot tell a 4\% drift from a 10\%
+drift. This asymmetry is structural (variance information accumulates much
+faster than mean information), and it dictates a design choice made later: the
+desk's P/L is built from \emph{delta-hedged} positions, whose expected value
+does not depend on $\mu$ at all (\S\ref{sec:hedgedpnl}).
+\end{obsbox}
 
-\subsection{Model comparison: LR, AIC, BIC}
-The models are nested (Merton $\to$ GBM as $\lambda\to0$), so we report
-\begin{equation}
-LR=2(\ell_M-\ell_G),\qquad AIC=2k-2\ell,\qquad BIC=k\ln n-2\ell .
-\end{equation}
-\textbf{Caveat stated openly:} the null $\lambda=0$ lies on the boundary of the
-parameter space, so the usual $\chi^2_3$ reference is conservative (the true null
-distribution is a mixture with more mass near zero). With the observed statistics
-this subtlety cannot change the verdict.
+\subsection{Merton: numerical MLE on the mixture density}
+The log-likelihood is $\sum_i\ln f(x_i)$ with $f$ from
+\eqref{eq:mertondensity}, truncated at $n\le8$ jumps per day --- justified
+because even at the largest fitted $\lambda$ ($\approx88$/yr,
+$\lambda\Delta t\approx0.35$), $\Prob(N>8)<10^{-10}$. Three practical
+complications, each handled explicitly:
+\begin{enumerate}[itemsep=2pt]
+\item \textbf{Positivity}: optimise $(\mu,\ln\sigma,\ln\lambda,\mu_J,
+  \ln\sigma_J)$ so the search space is unconstrained.
+\item \textbf{Multi-modality}: diffusion and jumps can partially imitate one
+  another (many small jumps look like diffusion), so the surface has multiple
+  local maxima. We run 8 random restarts of Nelder--Mead (a derivative-free
+  simplex search) and polish the best with BFGS (a quasi-Newton method).
+\item \textbf{Standard errors}: the observed information --- the numerically
+  differentiated Hessian of $-\ell$ at the optimum (central differences) ---
+  is inverted, and the delta method maps SEs through the log-links.
+\end{enumerate}
+Before touching real data the estimator is validated on synthetic data with
+known parameters (unit test: recovery within sampling error, and $LR>20$ when
+jumps are truly present).
+
+\subsection{Results and observations}
+\label{sec:physobs}
 
 \begin{table}[h]
 \centering\small
@@ -274,71 +577,106 @@ $\chi^2_3$ 95\% critical value: 7.81.}
  & \textbf{SPY (2008--2025)} & \textbf{NIFTY 50 (2007--2026)} \\
 \midrule
 $n$ (days) & 4{,}504 & 4{,}549 \\
-GBM $\hat\sigma$ & $0.2001 \pm 0.0021$ & $0.2071 \pm 0.0022$ \\
-Merton $\hat\sigma$ (diffusive) & $0.0979 \pm 0.0039$ & $0.1223 \pm 0.0038$ \\
-Merton $\hat\lambda$ (jumps/yr) & $87.9 \pm 10.6$ & $59.8 \pm 8.4$ \\
-Merton $\hat\mu_J$ & $-0.0026 \pm 0.0006$ & $-0.0015 \pm 0.0008$ \\
-Merton $\hat\sigma_J$ & $0.0175 \pm 0.0010$ & $0.0207 \pm 0.0013$ \\
+GBM $\hat\sigma$ & $0.2001\pm0.0021$ & $0.2071\pm0.0022$ \\
+Merton $\hat\sigma$ (diffusive) & $0.0979\pm0.0039$ & $0.1223\pm0.0038$ \\
+Merton $\hat\lambda$ (jumps/yr) & $87.9\pm10.6$ & $59.8\pm8.4$ \\
+Merton $\hat\mu_J$ & $-0.0026\pm0.0006$ & $-0.0015\pm0.0008$ \\
+Merton $\hat\sigma_J$ & $0.0175\pm0.0010$ & $0.0207\pm0.0013$ \\
 $LR$ vs GBM & \textbf{1627} & \textbf{1313} \\
 $\Delta BIC$ (GBM $-$ Merton) & 1602 & 1288 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\textbf{Reading Table~\ref{tab:physical}.} On both markets the data split the GBM
-volatility into a much smaller diffusive part plus a stream of frequent small
-mostly-negative jumps ($\approx$88/year for SPY of mean $-0.26\%$). The likelihood
-improvement is overwhelming: $\Delta BIC>10$ is conventionally ``decisive''; here it
-is above 1{,}200. Figures~\ref{fig:dens} and \ref{fig:qq} show \emph{where} the
-Gaussian fails: the tails. SPY's worst in-sample day ($-11.6\%$) is a
-${\approx}9\sigma$ event under fitted GBM --- effectively impossible --- while the
-Merton mixture assigns it sensible probability.
+\begin{obsbox}
+\textbf{Observation 1 (the verdict).} $LR=1627$ against a critical value of
+7.81: the Gaussian model is not marginally worse --- it is annihilated. The
+same on NIFTY 50 ($LR=1313$): this is a property of equity markets, not of one
+market. $\Delta BIC>1{,}200$ removes any ``too many parameters'' objection.
+
+\textbf{Observation 2 (how volatility decomposes).} The data reallocate SPY's
+20\% Gaussian volatility into a 9.8\% smooth diffusion \emph{plus} $\approx$88
+jumps per year averaging $-0.26\%$ with spread 1.75\%. The physical-measure
+jumps are frequent and small --- ``jump'' here means any discontinuous shock
+(news, gaps), not only crashes. Rare disasters appear as draws from the
+$\sigma_J$ tail: a $3\sigma_J$ jump is a $-5.5\%$ day.
+
+\textbf{Observation 3 (the smoking-gun day).} SPY's worst in-sample day is
+$-11.6\%$ (16 March 2020 --- the same date whose option chain is calibrated in
+\S\ref{sec:rnobs}). Under fitted GBM the daily sd is
+$0.2001/\sqrt{252}=1.26\%$, making that day a $z\approx-9.2$ event: probability
+$\sim10^{-20}$, ``once every $3\times10^{16}$ years'' by the table in \S1.2.
+The Merton fit assigns it a small but sane probability.
+Figure~\ref{fig:dens} shows this in one picture --- on a log scale the Gaussian
+falls away from the empirical tail points by many decades while the mixture
+tracks them; Figure~\ref{fig:qq} shows the same as QQ plots.
+\end{obsbox}
 
 \begin{figure}[h]\centering
 \includegraphics[width=\textwidth]{figs/fig1_densities.png}
-\caption{Daily-return densities on a log scale: empirical (grey points), fitted GBM
-(orange), fitted Merton (blue). The Gaussian collapses many decades too fast; the
-jump mixture tracks the empirical tails on both markets.}
+\caption{Daily-return densities, log scale: empirical (grey points), fitted GBM
+(orange), fitted Merton (blue). The log scale is essential: on a linear scale
+both fits look identical near the centre and the entire story --- the tails ---
+is invisible.}
 \label{fig:dens}
 \end{figure}
 
 \begin{figure}[h]\centering
 \includegraphics[width=\textwidth]{figs/fig2_qq_spy.png}
-\caption{QQ plots of SPY daily returns against each fitted model. Against GBM the
-empirical quantiles peel violently off the diagonal in both tails; against Merton
-they hug it.}
+\caption{QQ plots of SPY daily returns against each fitted model. Left (GBM):
+the S-shape means the model's tails are far too thin in both directions.
+Right (Merton): the points hug the diagonal, including the extreme quantiles.}
 \label{fig:qq}
 \end{figure}
 
-%=====================================================================
-\section{Calibration II: the risk-neutral measure}
-\label{sec:rn}
+%======================================================================
+\section{Calibration II: the risk-neutral measure (what options cost)}
+\label{sec:rncalib}
 
-Option prices reveal the \emph{market's} model. Quoting each option as its
-Black--Scholes \textbf{implied volatility} (the $\sigma$ that reproduces its price),
-a Gaussian world would produce a flat line across strikes; real markets produce a
-\textbf{skew} --- out-of-the-money puts trade at much higher implied vols, because
-the market pays up for crash insurance.
+\subsection{Why fit option prices separately}
+Fitting returns (\S\ref{sec:physical}) recovers the world's actual dynamics
+($P$-measure). Fitting option \emph{prices} recovers the dynamics the market
+uses to price risk ($Q$-measure, \S\ref{sec:rn}) --- these can differ, because
+sellers of crash insurance demand compensation beyond actuarial cost. Both
+matter to a desk: it hedges in the $P$-world but competes on $Q$-world prices.
+We fit Merton to four real SPY chains spanning regimes: 2017-01-03 (calm),
+2020-03-16 (COVID crash, VIX 82), 2022-06-13 (bear market), 2025-06-30
+(recent).
 
-For each snapshot we take the expiry nearest 90 days, keep OTM quotes with positive
-bids (the liquid side of the smile), compute mid-price implied vols by Brent
-root-finding (quotes violating no-arbitrage bounds are dropped), and fit Merton
-parameters by weighted least squares on the smile:
+\subsection{The fitting problem, in detail}
+For each snapshot: take the expiry nearest 90 days to match the desk's 3-month
+contract; keep OTM options only (OTM puts below spot, OTM calls above ---
+the liquid side of the smile, and ITM quotes duplicate OTM information via
+parity); require bid $>\$0.05$ and moneyness in $[0.70,1.30]$; compute
+mid-price implied vols (\S\ref{sec:iv}). Then solve
 \begin{equation}
-\min_{\sigma,\lambda,\mu_J,\sigma_J}\;\sum_i w_i\,
-\big(IV_M(K_i)-IV_{\text{mkt}}(K_i)\big)^2,\qquad
-w_i\propto \exp\!\Big[-\tfrac12\big(\tfrac{\ln(K_i/S)}{0.15}\big)^2\Big],
+\min_{\sigma,\lambda,\mu_J,\sigma_J}
+\sum_i w_i\big(IV_M(K_i)-IV_{\text{mkt}}(K_i)\big)^2,
+\qquad
+w_i\propto\exp\!\Big[-\tfrac12\Big(\frac{\ln(K_i/S)}{0.15}\Big)^{\!2}\Big].
 \label{eq:rnobj}
 \end{equation}
-ATM-centred weights because at-the-money quotes carry the most information per unit
-of noise (highest vega). For speed the optimiser uses the standard first-order
-equivalence $\Delta IV \approx \Delta\text{price}/\text{vega}$ with vega frozen at
-market IVs; the reported fit quality is recomputed by exact inversion.
+\textbf{Why weight by moneyness?} An option's price sensitivity to volatility
+is its vega, which peaks at the money; a fixed amount of quote noise (bid--ask
+bounce) therefore corrupts ATM implied vols least. Gaussian weights centred at
+ATM encode this. \textbf{Why fit IVs rather than prices?} Deep options differ
+in price by orders of magnitude; a price-space objective would be dominated by
+the most expensive quotes. IV-space puts all strikes on a common scale.
+\textbf{A speed trick, used honestly:} a first-order Taylor expansion gives
+$\Delta IV\approx\Delta\text{price}/\text{vega}$, so inside the optimiser we
+minimise vega-scaled \emph{price} residuals (vega frozen at market IVs ---
+a constant), avoiding a slow numerical inversion at every step; the final
+reported smile and RMSE are recomputed with exact inversion. Optimisation is
+multi-start Nelder--Mead with box constraints to keep the simplex out of absurd
+regions.
+
+\subsection{Results and observations}
+\label{sec:rnobs}
 
 \begin{table}[h]
 \centering\small
-\caption{Risk-neutral Merton calibrated to four real SPY chains ($\approx$90 DTE,
-OTM quotes).}
+\caption{Risk-neutral Merton fitted to four real SPY chains ($\approx$90 days
+to expiry, OTM quotes).}
 \label{tab:rn}
 \begin{tabular}{lccccccc}
 \toprule
@@ -353,308 +691,593 @@ RMSE (vol pts)\\
 \end{tabular}
 \end{table}
 
-\textbf{Reading Table~\ref{tab:rn}.} Even the calmest market prices roughly one
-$-10\%$ jump per year --- the smile \emph{never} believes Black--Scholes. In March
-2020 the market priced $\lambda=3.7$ crashes/year of mean $-31\%$. A 4-parameter
-model reproduces 40+ vol-point skews to within about one vol point
-(Figure~\ref{fig:smiles}). These COVID-chain parameters --- a jump world someone
-actually paid for --- define the ``true world'' of the mismatch experiments.
+\begin{obsbox}
+\textbf{Observation 4 (the smile never believes Black--Scholes).} Even in the
+calmest market at record-low volatility (2017), the fitted smile prices
+roughly one $-10\%$ jump per year. A flat-vol model is wrong on \emph{every}
+trading day, not just in crises.
+
+\textbf{Observation 5 (crisis pricing).} On 16 March 2020 the market priced
+$\lambda=3.68$ crashes/year with mean $-31\%$ and spread 19\%. These are the
+parameters used as the ``true world'' of the steamroller experiment --- a jump
+world market participants demonstrably paid for, not an invention.
+
+\textbf{Observation 6 (four parameters, forty vol points).} The 2020 smile
+spans $\approx40$ vol points from low-strike puts to high-strike calls; the
+4-parameter Merton fit reproduces it to 0.74 vol points RMSE
+(Figure~\ref{fig:smiles}). Parsimonious structure, not curve-fitting: the same
+four numbers must explain every strike simultaneously.
+
+\textbf{Observation 7 ($P$ vs $Q$).} Compare Tables~\ref{tab:physical} and
+\ref{tab:rn}: the physical measure shows many small jumps; the risk-neutral
+measure shows few large ones. The market \emph{overweights} disasters relative
+to their actuarial frequency --- that premium is the compensation demanded for
+holding crash risk, and it is why the right-model desk in a jump world still
+earns more than the naive half-spread (Observation 10).
+\end{obsbox}
 
 \begin{figure}[h]\centering
 \includegraphics[width=\textwidth]{figs/fig3_smiles.png}
-\caption{Real SPY implied-vol skews (grey), Merton fits (blue), and the flat smile
-Black--Scholes implies (orange dashed), on four dates spanning calm to crisis.}
+\caption{Real SPY implied-vol skews (grey), Merton fits (blue), and the flat
+smile Black--Scholes implies (orange dashed), across four regimes. The
+annotation box in each panel reports the fitted parameters and RMSE.}
 \label{fig:smiles}
 \end{figure}
 
-%=====================================================================
-\section{The desk: generating market-making P/L under model risk}
+%######################################################################
+\part{The Desk: Market-Making P/L Under Model Risk}
+\label{part:desk}
+
+%======================================================================
+\section{The simulation, piece by piece}
 \label{sec:desk}
 
-\subsection{Mechanics}
-Time advances in ticks ($dt=1/250$ years). At each tick the desk quotes a
-\emph{fresh} option with constant maturity $T=3$ months and strike at current spot
-($K_t=S_t$): rolling constant moneyness keeps the business stationary --- a fixed
-strike would drift out of the money as the underlying trends, silently shrinking
-both risk and revenue and contaminating every downstream statistic (this exact
-artefact was caught by a failing coverage backtest during development and is
-documented in the repo history). Around its believed fair value it posts
-$\text{bid}=V_{\text{mod}}-s$, $\text{ask}=V_{\text{mod}}+s$.
+\subsection{The quoting cycle}
+Time advances in ticks of $dt=1/250$ years ($\approx$ one trading day). At
+every tick the desk:
+\begin{enumerate}[itemsep=1pt]
+\item observes the spot $S_t$ (generated by the \emph{true} model --- GBM or
+  Merton --- which the desk cannot see);
+\item prices a \textbf{fresh} option with constant maturity $T=0.25$ and strike
+  $K_t=S_t$ (rolling at-the-money) using its \emph{believed} model:
+  $V_{\text{mod}}=V(S_t,K_t,T)$;
+\item posts $\text{bid}=V_{\text{mod}}-s$ and $\text{ask}=V_{\text{mod}}+s$
+  with half-spread $s=\$0.15$;
+\item receives client flow (\S\ref{sec:flow}); each fill is realised
+  immediately (\S\ref{sec:hedgedpnl}).
+\end{enumerate}
 
-When a client trades, the contract's P/L is \textbf{realised at the fill}: the
-underlying is simulated over the option's life under the \emph{true} model
-(GBM or Merton), while the desk delta-hedges at 30 rebalance dates using \emph{its
-own} model's delta, financing the hedge at $r$; premium, hedge cash flows and
-terminal payoff are discounted to the fill date. Realising at the fill keeps the
-equity curve a story about \emph{pricing edge}, not about an ever-growing open
-inventory position.
+\textbf{Why a rolling contract at rolling moneyness?} A desk is a
+\emph{business}, not a single bet; quoting the same kind of contract every day
+keeps its risk profile stationary, so P/L statistics across time are
+meaningful. This was learned the hard way: an earlier version fixed the strike
+$K=S_0$ forever, and over multi-year runs the drifting spot pushed the option
+far out of the money --- shrinking premiums, shrinking risk, and silently
+breaking the VaR backtest of \S\ref{sec:varbacktest} \emph{for the correct
+model}. A validation tool caught a simulation artefact; the fix (roll the
+strike with spot) is exactly the kind of specification issue model validators
+exist to find.
 
 \subsection{Why a hedged option earns ``premium minus fair value''}
-For a delta-hedged short option rebalanced continuously under the model's own
-dynamics, the $\dd W$ terms cancel and the hedged portfolio grows at $r$; the
-discounted P/L of (sell at premium $p$, hedge to expiry) converges to
+\label{sec:hedgedpnl}
+When a client trades, the contract's whole life is simulated immediately: the
+underlying evolves under the \emph{true} model over $[0,T]$ on a 30-step grid,
+and the desk delta-hedges at each step \emph{using its own model's delta},
+financing at $r$. The discounted P/L of a short-at-premium-$p$ put position is
 \begin{equation}
-\text{P/L}\;\longrightarrow\;p-V_{\text{fair}},
-\label{eq:hedgedpnl}
+\text{P/L}=p
++\sum_{j=0}^{29}e^{-r t_j}\,h_j\big(S_{t_{j+1}}-S_{t_j}e^{r\,\delta t}\big)
+-e^{-rT}\max(K-S_T,0),
+\label{eq:pnlaccounting}
 \end{equation}
-\emph{independent of the drift} $\mu$. Selling at $V+s$ or buying at $V-s$ then
-banks $+s$ per contract in expectation. Model error breaks both legs of this
-argument simultaneously: the quotes centre on the wrong $V$ (a systematic,
-sign-definite error), and the hedge follows the wrong delta --- worse, \emph{no}
-delta hedge can follow a jump, because the price gaps a finite amount in an
-instant. Two further honest caveats: with 30 discrete rebalances the cancellation
-in \eqref{eq:hedgedpnl} is approximate (mean-zero noise remains), and under jumps
-the market is \emph{incomplete} --- even the right-model desk retains
-undiversifiable jump risk plus a small residual drift exposure, which is why its
-realised edge in Table~\ref{tab:desk} ($0.194$) sits slightly above the quoted
-$0.15$ rather than exactly on it.
+where $h_j$ is the model-delta hedge held over $[t_j,t_{j+1}]$ (signs flip for
+bought contracts and for calls). The middle term is the hedge account: you
+earn the stock move but pay financing on the capital tied up, hence the
+financing-correct increment $S_{t_{j+1}}-S_{t_j}e^{r\delta t}$.
 
-\subsection{Elastic client flow: mispricing attracts sharks}
-Real clients compare quotes to value. Each side's fill probability is scaled by how
-bad the quote is for the client, in units of half-spread against \emph{true} fair
-value:
+\textbf{The key theorem, informally.} If the believed model is the true model
+and rebalancing is continuous, the hedge term exactly cancels the randomness of
+the payoff (that was the content of the Black--Scholes argument, \S6.3), and
+\eqref{eq:pnlaccounting} collapses to the deterministic quantity
 \begin{equation}
-p_{\text{fill}}=\min\!\Big(0.98,\;p_0\,
-e^{-\eta\cdot\text{excess}}\Big),\qquad
-\text{excess}_{\text{ask}}=\frac{\text{ask}-V_{\text{true}}}{s}-1,
-\label{eq:elastic}
+\text{P/L}\;\longrightarrow\;p-V_{\text{fair}} ,
+\label{eq:hedgedlimit}
 \end{equation}
-capped at $e^{2}\times$ the base rate (client arrival is finite even when the desk
-gives money away). A fairly-priced quote trades at the base rate; a rich quote
-loses business; a cheap quote is run over by informed flow --- adverse selection.
-Flow is put-heavy (base $\Prob(\text{client buys})=0.5$ vs $\Prob(\text{client
-sells})=0.1$ per tick), matching the real net demand for index crash protection,
-so a desk that underprices puts ends up systematically \emph{short} crash
-insurance. Without elasticity ($\eta=0$) the simulator reproduces the textbook
-version where an overpricing desk looks brilliant; with it, both directions of
-mispricing are punished --- which is what Table~\ref{tab:desk} shows.
+\emph{independent of the drift $\mu$}. Selling at $p=V+s$ therefore banks
+exactly $+s$; buying at $V-s$ banks $+s$ too. \textbf{Spread capture is a
+theorem --- conditional on the model being right.}
 
-\subsection{The four scenarios}
-All use $S_0=100$, ATM puts, $T=0.25$, $r=2\%$, $\mu=6\%$, $s=0.15$, 250 ticks
-(one year), seeds $0..n-1$:
-\begin{itemize}[itemsep=1pt]
-\item \textbf{Matched}: world GBM ($\sigma=0.20$, the SPY fit); desk prices
-  Black--Scholes with the same $\sigma$.
-\item \textbf{Steamroller}: world Merton with the COVID-chain parameters
-  ($\sigma=0.116,\lambda=3.68,\mu_J=-0.308,\sigma_J=0.19$); desk prices
-  Black--Scholes with only the diffusive $\sigma$.
-\item \textbf{Right model}: world as above; desk prices Merton with the true
-  parameters.
-\item \textbf{Overcautious}: world GBM; desk prices Merton with COVID jumps that
-  never come.
+\textbf{Where it breaks, precisely.}
+\begin{itemize}[itemsep=2pt]
+\item \emph{Discrete hedging} (30 steps, not continuous): the cancellation is
+  approximate; a mean-zero noise per contract survives, shrinking like
+  $1/\sqrt{\text{steps}}$. Visible as the wobble of realised P/L around the
+  expected lines in Figure~\ref{fig:equity} (left).
+\item \emph{Wrong fair value}: quotes centre on $V_{\text{mod}}$, so each sale
+  banks $s-(V_{\text{true}}-V_{\text{mod}})$ in true expectation --- a
+  systematic, sign-definite leak of about \$10/contract at COVID parameters.
+\item \emph{Wrong delta + jumps}: a jump moves the price a finite amount in an
+  instant; no rebalancing scheme, however frequent, can follow it. The hedge is
+  simply short the jump. This is why the damage is not just ``smaller edge''
+  but fat-tailed losses.
+\item \emph{Incompleteness}: even the \emph{right-model} desk cannot hedge
+  jumps with the underlying alone; some jump risk is unhedgeable and a small
+  drift exposure survives. Observation 10 quantifies the consequence.
 \end{itemize}
 
-%=====================================================================
-\section{Results I: P/L distributions and the price of model risk}
-\label{sec:risk}
+\subsection{Client flow: elastic, informed, put-heavy}
+\label{sec:flow}
+Each tick, a client may lift the ask (desk sells) with base probability 0.5 and
+may hit the bid (desk buys) with base probability 0.1 --- \textbf{put-heavy
+flow}, matching the real net demand for index crash protection (institutions
+buy puts to insure portfolios). Crucially, clients are not price-blind. Define
+the client's disadvantage in units of half-spread, e.g.\ for the ask:
+\begin{equation}
+\text{excess}_{\text{ask}}=\frac{\text{ask}-V_{\text{true}}}{s}-1
+\qquad(\text{0 for a fairly-priced quote}),
+\end{equation}
+and scale the fill probability
+\begin{equation}
+p_{\text{fill}}=\min\!\big(0.98,\;p_0\,e^{-\eta\,\text{excess}}\big),
+\qquad \eta=1,
+\label{eq:elastic}
+\end{equation}
+with the multiplier capped at $e^{2}\approx7.4\times$ (client arrival is finite
+even when the desk gives money away). Three regimes fall out naturally: a
+fairly-priced desk trades at base rates; a \emph{rich} quote loses business
+(clients shop elsewhere); a \emph{cheap} quote is hammered by informed flow ---
+\textbf{adverse selection}. Without elasticity ($\eta=0$) the simulator
+reproduces the textbook toy in which an overpricing desk looks brilliant
+because clients overpay forever; with it, both directions of mispricing are
+punished, which drives Observation 11.
+
+\subsection{The four scenarios}
+All share $S_0=100$, ATM puts, $T=0.25$, $r=2\%$, $\mu=6\%$, $s=0.15$,
+250 ticks (one year), independent seeds:
+\begin{center}\small
+\begin{tabular}{lll}
+\toprule
+Scenario & True world & Desk believes\\
+\midrule
+Matched & GBM, $\sigma=0.20$ (SPY fit) & Black--Scholes, same $\sigma$\\
+Steamroller & Merton, COVID params & Black--Scholes, $\sigma=0.116$ only\\
+Right model & Merton, COVID params & Merton, true params\\
+Overcautious & GBM, $\sigma=0.20$ & Merton with COVID jumps\\
+\bottomrule
+\end{tabular}
+\end{center}
+(COVID params: $\sigma=0.116,\lambda=3.68,\mu_J=-0.308,\sigma_J=0.19$ from
+Table~\ref{tab:rn}.) ``Steamroller'' evokes the trading aphorism about
+strategies that ``pick up pennies in front of a steamroller'': steady small
+gains punctuated by catastrophic loss. Each scenario runs across hundreds of
+seeds; a seed fixes the entire random path, so results are exactly
+reproducible.
+
+%======================================================================
+\section{Results I: what happened, and why}
+\label{sec:deskresults}
 
 \begin{table}[h]
 \centering\small
-\caption{Desk experiments across seeds. Edge CI is a 95\% percentile bootstrap on
-per-seed average realised edge per contract. Negative VaR/ES means the 5\% tail is
-still a profit.}
+\caption{Desk experiments across seeds. ``Believed edge'' is what the desk's own
+accounting reports per contract. Realised-edge CI: 95\% percentile bootstrap
+(\S\ref{sec:bootstrap}). Negative VaR/ES = the 5\% tail is still a profit.}
 \label{tab:desk}
 \begin{tabular}{lcccccc}
 \toprule
-Scenario & Seeds & Believed edge & Realised edge [95\% CI] & Mean P/L &
+Scenario & Seeds & Believed & Realised edge [95\% CI] & Mean P/L &
 VaR$_{5\%}$ & ES$_{5\%}$\\
 \midrule
-Matched & 300 & $+0.15$ & $+0.153\;[0.146, 0.159]$ & $+22.8$ & $-9.4$ & $-4.0$\\
-Right model & 200 & $+0.15$ & $+0.194\;[0.064, 0.324]$ & $+28.3$ & $207.9$ & $289.7$\\
-Steamroller & 300 & $+0.15$ & $-10.20\;[-10.62, -9.78]$ & $-2497.8$ & $4012.5$ & $4466.9$\\
-Overcautious & 200 & $+0.15$ & $-9.08\;[-9.23, -8.92]$ & $-1671.1$ & $2044.7$ & $2127.9$\\
+Matched & 300 & $+0.15$ & $+0.153\;[0.146,0.159]$ & $+22.8$ & $-9.4$ & $-4.0$\\
+Right model & 200 & $+0.15$ & $+0.194\;[0.064,0.324]$ & $+28.3$ & $207.9$ & $289.7$\\
+Steamroller & 300 & $+0.15$ & $-10.20\;[-10.62,-9.78]$ & $-2497.8$ & $4012.5$ & $4466.9$\\
+Overcautious & 200 & $+0.15$ & $-9.08\;[-9.23,-8.92]$ & $-1671.1$ & $2044.7$ & $2127.9$\\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\textbf{Reading Table~\ref{tab:desk}.} Three lessons. (i)~The matched desk delivers
-exactly what it promises --- realised edge statistically indistinguishable from the
-quoted half-spread. (ii)~The mismatched desks lose catastrophically \emph{in both
-directions}: underpricing is picked off by buyers of cheap crash insurance
-(steamroller), overpricing is picked off by sellers dumping overpriced options on
-the desk's rich bid (overcautious). Model risk is not ``being too cheap''; it is
-\emph{being wrong in either direction when the other side knows better}. (iii)~Even
-the right-model desk in a jump world carries much fatter P/L tails than the matched
-desk (incomplete market: jumps cannot be hedged away), which is a fact about
-markets, not a bug.
+\begin{obsbox}
+\textbf{Observation 8 (the matched desk delivers its promise, exactly).}
+Realised edge $+0.153$ with 95\% CI $[0.146,0.159]$ straddling the quoted
+$0.15$: spread capture works, and the residual wobble is the predicted
+discrete-hedging noise. This row is the \emph{control experiment} --- it
+certifies that the machinery (pricer, hedger, accounting) is sound, so
+everything that goes wrong elsewhere is attributable to the model mismatch and
+nothing else.
+
+\textbf{Observation 9 (belief vs reality, the headline).} The steamroller desk
+books $+0.15$/contract in its own accounting while realising $-10.20$. The
+believed-edge line is not slightly optimistic --- it has the wrong
+\emph{sign}, by a factor of $-68$. Figure~\ref{fig:equity} (right) shows the
+mechanism in time: the teal ``belief'' line climbs serenely while realised P/L
+staircases downward through jump losses. Note the mean loss per contract
+($\approx\$10.2$) matches the pricing gap $C_M-C_{BS}$ at COVID parameters
+predicted in \S\ref{sec:mertonpricing} --- worsened by adverse selection,
+since informed clients hit the too-cheap ask more often than base rate.
+
+\textbf{Observation 10 (the right model in a jump world: better, not serene).}
+Realised edge $+0.194>0.15$: the desk collects some jump-risk premium
+(Observation 7) because clients pay $Q$-measure prices while jumps realise at
+$P$-measure frequency --- and, being net short puts, the desk also keeps a
+small positive drift exposure that continuous-hedging theory would remove but
+jumps prevent. The price of operating in a jump world is variance: ES$_{5\%}$
+of 290 versus the matched desk's $-4$ --- vastly fatter tails \emph{with the
+correct model}. Jumps are unhedgeable with the underlying alone (an
+\emph{incomplete market}); knowing the truth shrinks but cannot remove tail
+risk.
+
+\textbf{Observation 11 (overpricing is not safety).} The overcautious desk ---
+right that the world ``might jump'', wrong about this world --- loses
+$-9.08$/contract. Mechanism: its quotes sit far above true value, so informed
+clients stop lifting its (rich) ask but hammer its (still-rich) bid, dumping
+overpriced options on the desk all day. \textbf{Model risk is not ``being too
+cheap''; it is being wrong in either direction when the counterparty knows
+better.} In the price-blind textbook version of this simulator the same desk
+\emph{prints money}; elasticity \eqref{eq:elastic} is the difference between a
+toy and an honest model of quoting.
+\end{obsbox}
 
 \begin{figure}[h]\centering
 \includegraphics[width=\textwidth]{figs/fig4_equity.png}
-\caption{One seed, two worlds. Left: matched desk --- realised P/L rides the
-believed and true edge lines. Right: steamroller --- the desk's own accounting
-(teal, top) reports steady profit while true expectation and realised P/L collapse.
-The vertical gap \emph{is} model risk in dollars.}
+\caption{One representative seed. Left, matched: realised P/L (blue) rides the
+believed (teal dashed) and true (orange dashed) edge lines, which coincide.
+Right, steamroller: belief and truth diverge from the first fill; realised P/L
+gaps downward at jumps the hedge cannot follow. The vertical gap between the
+teal and orange lines \emph{is} model risk, in dollars, accruing per trade.}
 \label{fig:equity}
 \end{figure}
 
 \begin{figure}[h]\centering
 \includegraphics[width=\textwidth]{figs/fig5_pnl_distributions.png}
-\caption{One-year P/L across seeds, all four scenarios (symlog scale).}
+\caption{One-year desk P/L across seeds, all four scenarios (symlog scale;
+violin = full distribution, thick bar = interquartile range, dot = median,
+annotated mean above). The two mismatched desks are not merely worse on
+average --- their entire distributions sit below zero.}
 \label{fig:dists}
 \end{figure}
 
-\subsection{The model-risk premium}
-Re-running the desk over a grid of half-spreads traces the loss-probability curve
-$s\mapsto\Prob(\text{P/L}(s)<0)$ (Figure~\ref{fig:breakeven}). Define the
-break-even spread as the smallest $s$ with $\Prob(\text{loss})\le5\%$:
-\begin{keybox}
-\textbf{Matched desk: breaks even at $s^\ast=8.8$ cents.}\\
-\textbf{Mispriced desk: no break-even below \$15} --- more than $170\times$ wider.
-With informed (elastic) flow, widening the quote throttles the business faster
-than it buys safety: the desk cannot spread its way out of a wrong model.
-\end{keybox}
-This is the project's answer to ``what does model risk cost'': for this desk, the
-model-risk premium is not a few extra cents of spread --- it is the difference
-between a viable business and no business at all.
+%######################################################################
+\part{Risk Measurement: Pricing the Damage}
+\label{part:risk}
+
+%======================================================================
+\section{VaR and Expected Shortfall, from scratch}
+\label{sec:vares}
+
+Let $L$ denote the desk's one-year P/L (profit positive) and $q_\alpha$ its
+$\alpha$-quantile. Two standard summaries of the left tail:
+\begin{equation}
+\text{VaR}_\alpha=-q_\alpha(L),
+\qquad
+\text{ES}_\alpha=-\E\big[L\mid L\le q_\alpha(L)\big].
+\label{eq:vares}
+\end{equation}
+\textbf{VaR} answers: ``what loss is exceeded only with probability
+$\alpha$?'' ($\alpha=5\%$ or 1\% conventionally). It is a quantile ---
+intuitive, but it says \emph{nothing about how bad the tail is beyond the
+threshold}: two desks can share a VaR while one hides a catastrophe behind it.
+\textbf{ES} fixes exactly that by averaging the losses beyond the quantile; it
+is also mathematically better behaved (\emph{subadditive}: diversifying two
+books cannot raise their combined ES, which can fail for VaR --- the reason
+banking regulation moved market-risk capital from VaR to ES). Estimation here
+is empirical: with hundreds of i.i.d.\ seeds, VaR is the sample quantile and ES
+the mean of the tail sample. Both appear in Table~\ref{tab:desk}; the
+steamroller's ES$_{5\%}=4{,}467$ versus the matched desk's $-4.0$ is the
+risk-measurement statement of the whole project.
+
+%======================================================================
+\section{The model-risk premium: a break-even spread search}
+\label{sec:breakeven}
+
+Spread is the desk's defence: a wider $s$ banks more per trade. So --- can a
+desk buy safety from a wrong model by quoting wider? Re-run the entire
+steamroller and matched batches over a grid of half-spreads and estimate the
+\textbf{loss-probability curve} $s\mapsto\Prob\big(\text{P/L}(s)<0\big)$; define
+the break-even $s^\ast$ as the smallest $s$ with loss probability $\le5\%$
+(linear interpolation between grid points). Elastic flow makes this experiment
+honest: widening quotes also drives clients away, so volume falls as $s$ rises.
+
+\begin{obsbox}
+\textbf{Observation 12 (8.8 cents vs \$15+).} The matched desk crosses the 5\%
+bar at $s^\ast=\$0.088$. The steamroller desk's curve
+(Figure~\ref{fig:breakeven}) decays with agonising slowness --- at $s=\$15$,
+more than a hundred times the matched break-even, its loss probability is
+still $\approx5.8\%$, so \textbf{no half-spread below \$15 clears the bar}.
+Mechanically: the desk needs $s$ to exceed the $\approx\$10$/contract
+mispricing \emph{plus} compensation for jump variance, but every dollar of
+extra spread throttles the arrival rate \eqref{eq:elastic}, so safety recedes
+almost as fast as the desk chases it. \textbf{The model-risk premium here is
+not a few cents on the spread; it is the difference between a competitive
+business and no business.} A desk quoting \$15 half-spreads on a \$10 option
+has no clients; the only real remedies are a better model or exiting the
+product.
+\end{obsbox}
 
 \begin{figure}[h]\centering
 \includegraphics[width=0.85\textwidth]{figs/fig6_breakeven.png}
-\caption{Loss probability vs quoted half-spread (log scale).}
+\caption{Loss probability vs quoted half-spread (log-scale $x$). Blue: matched
+desk, break-even at 8.8 cents. Red: the mispriced desk never reaches the 5\%
+target inside the plotted range.}
 \label{fig:breakeven}
 \end{figure}
 
-%=====================================================================
-\section{Results II: validation --- catching the wrong model from P/L alone}
-\label{sec:validation}
+%######################################################################
+\part{Validation: Catching the Wrong Model from P/L Alone}
+\label{part:validation}
 
-A model validator does not get to observe ``the true model''; they observe
-\emph{outcomes}. This section runs the standard MRM toolkit on the desk's realised
-P/L, on a six-year run (1{,}500 ticks) for test power. To keep the P/L series
-stationary, all per-tick quantities are scaled by the spot level (risk per unit of
-notional --- an ATM option's dollar value is proportional to $S$).
+A model validator does not observe ``the true model''; they observe
+\emph{outcomes}. This part treats the desk's model as a statistical hypothesis
+and tests it against realised P/L --- the day job of bank model-risk teams
+(codified in the Federal Reserve's SR~11-7 guidance). Setup for all tests: a
+six-year run (1{,}500 ticks) for statistical power; and every per-tick P/L is
+divided by $S_t/S_0$ --- \textbf{spot-scaling} --- because an ATM option's
+dollar value is proportional to the spot level, so risk must be measured per
+unit of notional for the series to be stationary. (This, too, was learned from
+a failing backtest: unscaled, the matched desk's P/L variance grows with the
+drifting spot and a static VaR fails coverage \emph{for the correct model} ---
+a second simulation artefact caught by validation tooling.)
 
-\subsection{Kupiec's proportion-of-failures (POF) test}
-The desk forecasts its own 5\% one-tick VaR by simulating its \emph{believed} world
-(the standard model-based VaR practice). If the model is right, losses should
-exceed VaR on $\alpha=5\%$ of ticks, independently. Observing $x$ exceptions in $n$
-ticks:
+%======================================================================
+\section{VaR backtesting}
+\label{sec:varbacktest}
+
+\subsection{The desk forecasts its own risk}
+Standard practice: the desk computes VaR from \emph{its own} model. Here, the
+desk simulates its believed world (Black--Scholes/GBM dynamics with its own
+parameters) over 25 seeds, pools the spot-scaled per-tick P/L increments, and
+takes the empirical 5\% quantile as its one-tick $\text{VaR}_{5\%}$ forecast.
+Then it lives in the true world, and each tick is scored: an
+\textbf{exception} occurs when the realised loss exceeds the forecast VaR.
+If the model is right, exceptions should (i) occur on 5\% of ticks and (ii) be
+independent over time. Kupiec tests (i); Christoffersen tests (ii).
+
+\subsection{Kupiec's proportion-of-failures test, derived}
+\label{sec:kupiec}
+Under $H_0$ the exception indicator is i.i.d.\ Bernoulli($\alpha$), so the
+number of exceptions $x$ in $n$ ticks is Binomial($n,\alpha$). The likelihood
+of the observed sequence under exception probability $\pi$ is
+$\pi^{x}(1-\pi)^{n-x}$; its MLE is $\hat\pi=x/n$. The likelihood-ratio
+statistic comparing ``$\pi=\alpha$'' against ``$\pi$ free'' is
 \begin{equation}
 LR_{\text{pof}}
-=-2\ln\frac{(1-\alpha)^{n-x}\alpha^{x}}{(1-\hat\pi)^{n-x}\hat\pi^{x}}
-\;\overset{H_0}{\sim}\;\chi^2_1,\qquad \hat\pi=x/n .
+=-2\ln\frac{\alpha^{x}(1-\alpha)^{n-x}}{\hat\pi^{x}(1-\hat\pi)^{n-x}}
+\;\overset{H_0}{\sim}\;\chi^2_1
+\quad\text{(Wilks, \S\ref{sec:lrtest})}.
+\label{eq:kupiec}
 \end{equation}
+Worked on our data ($n=1500$, $\alpha=0.05$, expected $75$):
+\begin{itemize}[itemsep=1pt]
+\item \emph{Matched desk}: $x=83$, $\hat\pi=5.53\%$. Plugging in:
+  $LR_{\text{pof}}=0.87$, $p=0.351$. The observed excess of 8 exceptions is
+  entirely consistent with chance. \textbf{Correct coverage.}
+\item \emph{Steamroller}: $x=811$, $\hat\pi=54.1\%$. The model claimed 5\%;
+  reality delivered 54\% --- the desk blows through its own VaR on more than
+  half of all days. $LR_{\text{pof}}$ is in the thousands, $p<10^{-16}$.
+  \textbf{Catastrophic rejection.}
+\end{itemize}
 
-\subsection{Christoffersen's independence and conditional coverage}
-Correct frequency is not enough --- exceptions must not \emph{cluster}. Model the
-exception indicator as a two-state Markov chain with transition counts $n_{ij}$
-and conditional exception probabilities $\pi_0,\pi_1$; test $\pi_0=\pi_1$:
+\subsection{Christoffersen's independence and conditional-coverage tests}
+\label{sec:christoffersen}
+Correct frequency is not sufficient: 75 exceptions all in one month is a
+broken model with perfect unconditional coverage. Christoffersen models the
+exception indicator as a two-state Markov chain. Count transitions
+$n_{ij}$ (from state $i\in\{0,1\}$ yesterday to $j$ today) and let
+$\hat\pi_0=n_{01}/(n_{00}+n_{01})$, $\hat\pi_1=n_{11}/(n_{10}+n_{11})$ ---
+the exception probability after a calm day vs after an exception day.
+Independence means $\pi_0=\pi_1$; the LR test of that restriction is
 \begin{equation}
-LR_{\text{ind}}=-2\ln\frac{(1-\hat\pi)^{n_{00}+n_{10}}\hat\pi^{\,n_{01}+n_{11}}}
-{(1-\hat\pi_0)^{n_{00}}\hat\pi_0^{\,n_{01}}(1-\hat\pi_1)^{n_{10}}\hat\pi_1^{\,n_{11}}}
-\overset{H_0}{\sim}\chi^2_1,
-\qquad LR_{cc}=LR_{\text{pof}}+LR_{\text{ind}}\overset{H_0}{\sim}\chi^2_2 .
+LR_{\text{ind}}
+=-2\ln\frac{(1-\hat\pi)^{n_{00}+n_{10}}\,\hat\pi^{\,n_{01}+n_{11}}}
+{(1-\hat\pi_0)^{n_{00}}\hat\pi_0^{\,n_{01}}
+(1-\hat\pi_1)^{n_{10}}\hat\pi_1^{\,n_{11}}}
+\;\overset{H_0}{\sim}\;\chi^2_1 ,
+\label{eq:christ}
 \end{equation}
-Clustered exceptions are the signature of dynamics the model does not have ---
-here, jumps.
+and the \textbf{conditional coverage} statistic
+$LR_{cc}=LR_{\text{pof}}+LR_{\text{ind}}\sim\chi^2_2$ tests both properties at
+once.
 
-\subsection{Bootstrap inference on realised edge}
-Per-seed average edges are i.i.d.\ by construction, so a percentile bootstrap
-(10{,}000 resamples) gives honest confidence intervals for mean edge, reported in
-Table~\ref{tab:desk}, alongside a one-sample $t$-test of $H_0$: mean edge $=0$.
+\begin{obsbox}
+\textbf{Observation 13 (coverage).} Matched: Kupiec $p=0.351$, CC $p=0.619$
+--- the correct model passes both, which certifies the tests' false-alarm
+behaviour on healthy data. Steamroller: both $p<10^{-16}$.
 
-\subsection{CUSUM: the early-warning monitor}
-Waiting a year for a backtest is a luxury; a desk bleeding edge should be caught in
-weeks. The one-sided CUSUM tracks cumulative under-delivery of the promised edge
-$m$ on spot-scaled per-trade residuals $X_t$:
-\begin{equation}
-C_0=0,\qquad C_t=\max\big(0,\;C_{t-1}+(m-X_t)-k\big),
-\qquad\text{alarm when } C_t>h,
-\end{equation}
-with allowance $k=0.5\hat\sigma$ and threshold $h=8\hat\sigma$, control limits
-calibrated on a burn-in window that is excluded from monitoring (you do not raise
-alarms on the data used to set the limits).
-
-\begin{table}[h]
-\centering\small
-\caption{Validation results on six-year runs (1{,}500 ticks; expected exceptions
-75).}
-\label{tab:validation}
-\begin{tabular}{lccc}
-\toprule
-Test & Matched desk & Mispriced desk & Verdict\\
-\midrule
-Kupiec POF & 83 exc., $p=0.351$ & 811 exc., $p<10^{-16}$ &
-right model passes; wrong fails\\
-Christoffersen CC & $p=0.619$ & $p<10^{-16}$ & wrong model's exceptions cluster\\
-CUSUM & no alarm in 903 trades & alarm at trade \textbf{83} of 1{,}467 &
-detection in $\sim$3 weeks\\
-\bottomrule
-\end{tabular}
-\end{table}
+\textbf{Observation 14 (clustering is the fingerprint of jumps).} The
+steamroller's exceptions do not arrive uniformly: Figure~\ref{fig:exceptions}
+shows them bunched into episodes --- a jump craters the P/L and the elevated
+loss regime persists while the desk keeps quoting through it, so
+$\hat\pi_1>\hat\pi_0$. Clustered exceptions tell the validator not only
+\emph{that} the model is wrong but \emph{what kind} of dynamics it is missing:
+state-dependent risk (jumps, volatility regimes) rather than a mere level
+miscalibration of VaR.
+\end{obsbox}
 
 \begin{figure}[h]\centering
 \includegraphics[width=\textwidth]{figs/fig8_var_exceptions.png}
-\caption{5\% VaR exception timelines. Matched: 83 scattered exceptions vs 75
-expected. Mispriced: 811, clustered into jump episodes.}
+\caption{5\% VaR exception timelines over six years. Top (matched): 83
+exceptions vs 75 expected, scattered. Bottom (steamroller): 811, clustered
+into jump episodes.}
 \label{fig:exceptions}
 \end{figure}
 
+%======================================================================
+\section{The bootstrap: honest error bars on realised edge}
+\label{sec:bootstrap}
+
+\textbf{The problem.} ``The desk averaged $+0.153$ per contract'' --- is that
+meaningfully different from the promised $0.15$? From zero? Any answer needs
+the sampling distribution of the mean, and the P/L distribution is skewed and
+fat-tailed, so Gaussian formulas are suspect.
+
+\textbf{The plug-in principle.} The bootstrap replaces the unknown population
+by the sample itself: draw $n$ values \emph{with replacement} from the observed
+per-seed edges, compute the mean, repeat $B=10{,}000$ times; the spread of
+those $B$ means estimates the sampling variability of the original mean. The
+\textbf{percentile interval} takes the 2.5th and 97.5th percentiles of the
+bootstrap means as a 95\% CI. Validity here is clean: seeds are i.i.d.\ by
+construction, which is exactly the bootstrap's core assumption. A one-sample
+$t$-test of $H_0{:}$ mean $=0$ is reported alongside as a cross-check.
+
+\begin{obsbox}
+\textbf{Observation 15.} Matched: $+0.153$, CI $[0.146,0.159]$ --- excludes
+zero decisively, contains the promised $0.15$: the desk delivers its quoted
+edge and the theory of \S\ref{sec:hedgedpnl} is confirmed \emph{with error
+bars}, not by eyeball. Steamroller: $-10.20$, CI $[-10.62,-9.78]$ ---
+significantly, catastrophically negative. Right-model: CI $[0.064,0.324]$ ---
+positive but wide, quantifying how much harder it is to measure edge in a
+fat-tailed world (similar seed count, several times the uncertainty).
+\end{obsbox}
+
+%======================================================================
+\section{CUSUM: the early-warning monitor}
+\label{sec:cusum}
+
+\subsection{The problem: detect a change, fast, without crying wolf}
+The backtests above are retrospective --- they need a long sample. A desk
+bleeding edge should be caught in \emph{weeks}. This is sequential change
+detection: monitor a stream $X_1,X_2,\dots$ (here: spot-scaled per-trade edge
+residuals, $X_t=$ realised edge $-$ promised edge) and raise an alarm as soon
+as its mean has shifted down, while rarely alarming if nothing changed. The
+two error rates trade off: a hair-trigger monitor detects fast but
+false-alarms constantly; a sluggish one never cries wolf and never warns.
+
+\subsection{The CUSUM statistic}
+Page's one-sided CUSUM accumulates evidence of under-delivery but never lets
+credit build up (the $\max(0,\cdot)$ clamp --- past overperformance must not
+mask a current bleed):
+\begin{equation}
+C_0=0,\qquad
+C_t=\max\big(0,\;C_{t-1}+(m-X_t)-k\big),\qquad
+\text{alarm when } C_t>h .
+\label{eq:cusum}
+\end{equation}
+Here $m$ is the promised edge, $k$ an \emph{allowance} (slack absorbing normal
+noise; we use $k=0.5\hat\sigma$, the classic choice --- tuned to half the
+shift one wants to detect, a rule inherited from the statistic's
+sequential-likelihood-ratio derivation), and $h$ an \emph{alarm threshold}
+($8\hat\sigma$) controlling the false-alarm rate: larger $h$ means rarer false
+alarms but slower detection (formalised by \emph{average run lengths}: the
+mean time to a false alarm on a healthy stream, ARL$_0$, versus the mean
+detection delay after a real shift, ARL$_1$). The noise scale $\hat\sigma$ is
+estimated on a \textbf{burn-in window} which is then \emph{excluded from
+monitoring} --- you do not raise alarms on the data used to set the control
+limits, a rule inherited from industrial quality control.
+
+\begin{obsbox}
+\textbf{Observation 16 (detection in three weeks, zero false alarms).} On the
+steamroller desk the CUSUM crosses $h$ at \textbf{trade 83 of 1{,}467} ---
+roughly three weeks into a six-year run, long before the equity curve is
+visually diagnostic and \emph{years} before a Kupiec test would have a
+meaningful sample. On the matched desk, the statistic breathes below threshold
+for all 903 trades: no false alarm (Figure~\ref{fig:cusum}). The pairing
+matters: a monitor is only as good as its false-alarm behaviour on healthy
+systems, which is why both curves are shown on the same limits.
+\end{obsbox}
+
 \begin{figure}[h]\centering
 \includegraphics[width=0.9\textwidth]{figs/fig7_cusum.png}
-\caption{CUSUM paths. The matched desk's statistic breathes below threshold for
-900+ trades (zero false alarms); the mispriced desk crosses at trade 83.}
+\caption{One-sided CUSUM on spot-scaled edge residuals (symlog $y$). Blue:
+matched desk, never alarms. Red: mispriced desk, crosses the threshold at
+trade 83.}
 \label{fig:cusum}
 \end{figure}
 
 \begin{keybox}
-\textbf{The validator's takeaway.} The wrong model is not merely unprofitable ---
-it is \emph{statistically detectable} from realised P/L, quickly, with tests whose
-false-alarm behaviour is verified on the correctly-specified desk. This is the
-entire logic of model risk management, demonstrated end to end on one desk.
+\textbf{The validator's playbook, assembled.} Coverage tests
+(\S\ref{sec:varbacktest}) ask ``is the model's risk forecast honest?'';
+clustering tests ask ``is the risk \emph{dynamics} right?''; bootstrap
+inference (\S\ref{sec:bootstrap}) asks ``is the claimed edge real?''; CUSUM
+(\S\ref{sec:cusum}) asks all of it \emph{continuously, in near-real-time}.
+Together they detect the wrong model from outcomes alone --- no access to
+``truth'' required --- with verified false-alarm control. That is the entire
+logic of model risk management, demonstrated end to end on one desk.
 \end{keybox}
 
-%=====================================================================
+%######################################################################
+\part{Closing Material}
+
+%======================================================================
 \section{Limitations, stated plainly}
 \label{sec:limitations}
 \begin{itemize}[itemsep=2pt]
-\item \textbf{Stylised microstructure.} One contract, Bernoulli client arrivals, a
-  reduced-form elasticity \eqref{eq:elastic} rather than an order book or a
-  utility-based client model.
-\item \textbf{Static parameters within runs.} No stochastic volatility, no
-  parameter drift; the ``truth'' inside each experiment is a fixed Merton world.
-  Real model risk includes the model being wrong \emph{in form}, not only in
-  parameters --- our mismatch captures exactly one axis of that.
-\item \textbf{Boundary null in the LR test} (Section~\ref{sec:physical});
-  conclusions are robust here but the caveat matters at smaller samples.
-\item \textbf{Incomplete-market subtleties} under jumps: hedged P/L is not fully
-  drift-free, and jump risk premia (difference between $P$- and $Q$-measure jump
-  parameters) are real economics that the right-model desk partially collects; a
-  full treatment would separate them explicitly.
-\item \textbf{Data vintage.} Chains end December 2025; NIFTY options are not in
-  the free mirror used (the repo ships a fetch script for NSE data to extend the
-  Indian leg).
+\item \textbf{Stylised microstructure.} One contract quoted at a time,
+  Bernoulli arrivals, reduced-form elasticity \eqref{eq:elastic} --- no order
+  book, no strategic clients, no inventory limits.
+\item \textbf{Fixed truth within runs.} Each experiment's true world is a
+  fixed-parameter Merton or GBM; real model risk also includes forms neither
+  model spans (stochastic volatility, regime switching) and parameters that
+  drift.
+\item \textbf{Boundary null} in the LR test (\S\ref{sec:lrtest}) ---
+  conservative here, and decisively overwhelmed at these statistic sizes.
+\item \textbf{Incomplete-market economics compressed.} Jump-risk premia
+  ($P$--$Q$ gaps) are real and only partially disentangled from hedging
+  residuals in Observation 10; a full treatment would separate them.
+\item \textbf{Data vintage.} Option chains end December 2025; NIFTY options
+  are not in the free mirror (the repo ships a fetch script to extend both).
 \end{itemize}
-None of these change the qualitative conclusions; each is a natural extension.
+None of these threaten the qualitative conclusions; each is a concrete
+extension path.
 
-%=====================================================================
-\section{Reproducibility}
+%======================================================================
+\section{Reproducibility and repository map}
 \label{sec:repro}
-Everything regenerates from two commands:
+Every number and figure in this document regenerates from two commands:
 \begin{center}
-\texttt{python scripts/run\_experiments.py} \quad$\rightarrow$\quad
+\texttt{python scripts/run\_experiments.py}\quad$\rightarrow$\quad
 \texttt{python scripts/make\_figures.py}
 \end{center}
-Deterministic seeds throughout; 15 unit tests (put--call parity, delta vs finite
-differences, Merton $\to$ BS convergence, MLE recovery on synthetic data, matched
-desk realising its half-spread, Kupiec/Christoffersen/CUSUM behaviour on synthetic
-series) run via \texttt{python -m pytest tests/}. The interactive website ports the
-same engine to JavaScript with a seeded RNG. Repository:
-\url{https://github.com/Arijitray2/model-risk-lab}.
+Seeds are fixed throughout; 15 unit tests (\texttt{python -m pytest tests/})
+pin put--call parity ($10^{-10}$), deltas against finite differences, Merton
+$\to$ BS convergence as $\lambda\to0$, MLE parameter recovery on synthetic
+data, the matched desk's realised edge, and the acceptance/rejection/alarm
+behaviour of every validation test on synthetic series with known properties.
+The public website (\texttt{docs/}) contains an interactive JavaScript port of
+the full engine --- seeded RNG, Merton series pricer, hedged-fill realisation,
+elastic flow --- so every experiment in this document can be re-run in a
+browser. Data provenance is documented file-by-file in
+\texttt{data/README.md}.
 
-%=====================================================================
+%======================================================================
+\section*{Glossary}
+\begin{description}[itemsep=1pt,font=\normalfont\itshape]
+\item[Adverse selection] Losing systematically to better-informed
+  counterparties; here, mispriced quotes getting picked off.
+\item[ATM/OTM/ITM] At/out-of/in-the-money: strike at, unfavourable to, or
+  favourable to current spot.
+\item[Delta] Sensitivity of option value to spot, $\partial V/\partial S$; the
+  hedge ratio.
+\item[Drift ($\mu$)] Expected growth rate of the underlying per year.
+\item[Edge] Expected profit per trade; for a market maker, the half-spread.
+\item[ES (Expected Shortfall)] Average loss beyond the VaR quantile.
+\item[Half-spread ($s$)] Half the gap between ask and bid.
+\item[Implied volatility] The $\sigma$ that makes Black--Scholes match a price.
+\item[MLE] Maximum-likelihood estimator.
+\item[Moneyness] $K/S$; locates strike relative to spot.
+\item[$P$ vs $Q$ measure] Real-world vs risk-neutral (pricing) probabilities.
+\item[Risk-free rate ($r$)] Return on riskless lending; the discounting rate.
+\item[VaR] Loss threshold exceeded with probability $\alpha$.
+\item[Vega] Sensitivity of option value to volatility.
+\end{description}
+
+%======================================================================
 \section*{References}
 \begin{itemize}[itemsep=1pt,label={}]
-\item Black, F., Scholes, M. (1973). The Pricing of Options and Corporate
-  Liabilities. \emph{JPE} 81(3).
-\item Merton, R.C. (1976). Option pricing when underlying stock returns are
-  discontinuous. \emph{JFE} 3(1--2).
-\item Kupiec, P. (1995). Techniques for Verifying the Accuracy of Risk Measurement
-  Models. \emph{J. Derivatives} 3(2).
-\item Christoffersen, P. (1998). Evaluating Interval Forecasts. \emph{IER} 39(4).
-\item Page, E.S. (1954). Continuous Inspection Schemes. \emph{Biometrika} 41.
-\item Board of Governors of the Federal Reserve (2011). SR 11-7: Guidance on Model
-  Risk Management.
-\item Paolucci, R. --- Quant Guild (2026). \emph{Projects to Help you Become a
+\item Black, F., Scholes, M.\ (1973). The Pricing of Options and Corporate
+  Liabilities. \emph{Journal of Political Economy} 81(3).
+\item Merton, R.C.\ (1976). Option pricing when underlying stock returns are
+  discontinuous. \emph{Journal of Financial Economics} 3(1--2).
+\item Kupiec, P.\ (1995). Techniques for Verifying the Accuracy of Risk
+  Measurement Models. \emph{Journal of Derivatives} 3(2).
+\item Christoffersen, P.\ (1998). Evaluating Interval Forecasts.
+  \emph{International Economic Review} 39(4).
+\item Page, E.S.\ (1954). Continuous Inspection Schemes. \emph{Biometrika} 41.
+\item Efron, B.\ (1979). Bootstrap Methods: Another Look at the Jackknife.
+  \emph{Annals of Statistics} 7(1).
+\item Wilks, S.S.\ (1938). The Large-Sample Distribution of the Likelihood
+  Ratio. \emph{Annals of Mathematical Statistics} 9(1).
+\item Board of Governors of the Federal Reserve (2011). SR 11-7: Guidance on
+  Model Risk Management.
+\item Paolucci, R.\ --- Quant Guild (2026). \emph{Projects to Help you Become a
   Quant (Intermediate)} --- the teaching simulator this project modifies and
   extends.
 \end{itemize}
