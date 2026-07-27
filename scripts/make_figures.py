@@ -19,17 +19,24 @@ import matplotlib.pyplot as plt
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
 RES = os.path.join(ROOT, "results")
-FIG = os.path.join(RES, "figures")
-os.makedirs(FIG, exist_ok=True)
 
-# --- palette (validated; see docs) -----------------------------------------
-BLUE, ORANGE, AQUA, RED, VIOLET = "#2a78d6", "#eb6834", "#1baf7a", "#e34948", "#4a3aa7"
-INK, INK2, MUTED, GRID, SURFACE = "#0b0b0b", "#52514e", "#898781", "#e1e0d9", "#fcfcfb"
+# --- palette (validated; see docs). `--dark` regenerates the SVGs on the
+# dark site surface (used by the website); default light mode feeds the PDF.
+DARK = "--dark" in sys.argv
+if DARK:
+    FIG = os.path.join(ROOT, "docs", "assets", "figures")
+    BLUE, ORANGE, AQUA, RED, VIOLET = "#3987e5", "#d95926", "#199e70", "#e66767", "#9085e9"
+    INK, INK2, MUTED, GRID, SURFACE = "#ffffff", "#c3c2b7", "#898781", "#262c33", "#11161d"
+else:
+    FIG = os.path.join(RES, "figures")
+    BLUE, ORANGE, AQUA, RED, VIOLET = "#2a78d6", "#eb6834", "#1baf7a", "#e34948", "#4a3aa7"
+    INK, INK2, MUTED, GRID, SURFACE = "#0b0b0b", "#52514e", "#898781", "#e1e0d9", "#fcfcfb"
+os.makedirs(FIG, exist_ok=True)
 
 plt.rcParams.update({
     "figure.facecolor": SURFACE, "axes.facecolor": SURFACE,
     "savefig.facecolor": SURFACE,
-    "axes.edgecolor": "#c3c2b7", "axes.linewidth": 0.8,
+    "axes.edgecolor": "#3a4450" if DARK else "#c3c2b7", "axes.linewidth": 0.8,
     "axes.grid": True, "grid.color": GRID, "grid.linewidth": 0.6,
     "axes.axisbelow": True,
     "text.color": INK, "axes.labelcolor": INK2,
@@ -48,7 +55,7 @@ def load(name):
 
 
 def save(fig, name):
-    for ext in ("png", "svg"):
+    for ext in (("svg",) if DARK else ("png", "svg")):
         fig.savefig(os.path.join(FIG, f"{name}.{ext}"),
                     dpi=300 if ext == "png" else None, bbox_inches="tight")
     plt.close(fig)

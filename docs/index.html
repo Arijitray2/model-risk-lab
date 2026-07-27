@@ -6,111 +6,129 @@
 <title>Model Risk Lab — what a wrong model costs, in dollars</title>
 <meta name="description" content="An options market-making desk simulated under model risk, calibrated to real SPY and NIFTY 50 data, with a full model-validation suite.">
 <link rel="stylesheet" href="assets/style.css">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#128200;</text></svg>">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='18' fill='%230b0f14'/><text x='18' y='72' font-size='60' fill='%2327c93f' font-family='monospace'>▮</text></svg>">
 </head>
 <body>
 
 <nav><div class="nav-inner">
-  <a class="brand" href="index.html">Model<span>Risk</span>Lab</a>
-  <a class="link active" href="index.html">Overview</a>
-  <a class="link" href="methodology.html">Methodology</a>
-  <a class="link" href="demo.html">Live demo</a>
-  <a class="link" href="results.html">Results</a>
-  <a class="link gh" href="https://github.com/Arijitray2/model-risk-lab">GitHub &nearr;</a>
+  <a class="brand" href="index.html">model<span>@</span>risk-lab</a>
+  <a class="link active" href="index.html">overview</a>
+  <a class="link" href="methodology.html">methodology</a>
+  <a class="link" href="demo.html">live-demo</a>
+  <a class="link" href="results.html">results</a>
+  <a class="link gh" href="https://github.com/Arijitray2/model-risk-lab">github ↗</a>
 </div></nav>
 
 <div class="wrap">
 
 <section class="hero">
-  <span class="kicker">Quantitative finance · Model risk · Real market data</span>
-  <h1>When the desk prices with the wrong model,<br>what does it <span class="accent">cost — in dollars?</span></h1>
+  <span class="kicker">● LIVE — quant finance · model risk · real market data</span>
+  <h1>The desk thinks it's printing money.<br>The market <span class="accent">knows better.</span></h1>
   <p class="lede">
-    An options market-making desk is simulated tick by tick under a true world it
-    cannot see. Its pricing models are calibrated to <b>real SPY option chains
-    (2008&ndash;2025)</b> and <b>17 years of SPY &amp; NIFTY&nbsp;50 returns</b> by maximum
-    likelihood. Then a model-validation suite — the statistical toolkit used by bank
-    model-risk teams — detects the broken model from its P/L alone.
+    An options market-making desk, simulated tick by tick under a true world it cannot
+    see — calibrated to <b>real SPY option chains (2008–2025)</b> and <b>17 years of
+    SPY &amp; NIFTY&nbsp;50 returns</b>. Below: a desk pricing Black–Scholes while the
+    world jumps. Its own accounting climbs. Its actual P/L doesn't.
   </p>
+
+  <div class="termwin">
+    <div class="termbar">
+      <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+      <span class="termtitle">desk — quoting 3M ATM puts — pricing: BLACK-SCHOLES · world: MERTON(COVID)</span>
+    </div>
+    <div class="termbody">
+      <div class="tickrow">
+        <span>SPOT <b id="tkSpot">100.00</b></span>
+        <span>TRADES <b id="tkTrades">0</b></span>
+        <span>DESK BELIEVES <b class="up" id="tkBel">+0.00</b></span>
+        <span>REALISED P/L <b id="tkReal">+0.00</b></span>
+        <span id="tkJump" style="opacity:0;color:var(--red)">▼ JUMP</span>
+      </div>
+      <canvas id="heroCanvas"></canvas>
+    </div>
+  </div>
+  <p class="sub">Live simulation running in your browser — same engine as the <a href="demo.html">full demo</a>. It resets and replays forever; the ending never changes.</p>
+
   <div class="btn-row">
-    <a class="btn primary" href="demo.html">&#9654;&nbsp; Run the live simulator</a>
-    <a class="btn ghost" href="methodology.html">Read the methodology</a>
-    <a class="btn ghost" href="report/model_risk_lab_report.pdf">Full report (PDF)</a>
+    <a class="btn primary" href="demo.html">▶ run the full simulator</a>
+    <a class="btn ghost" href="methodology.html">read the math</a>
+    <a class="btn ghost" href="report/model_risk_lab_report.pdf">24-page report (PDF)</a>
   </div>
 </section>
 
-<section>
+<section class="reveal">
   <div class="grid c4">
     <div class="card stat">
-      <div class="v blue">LR &asymp; 1627</div>
-      <div class="l">Likelihood-ratio statistic rejecting Black&ndash;Scholes/GBM on 17y of SPY daily returns (1313 on NIFTY 50).</div>
+      <div class="v blue"><span data-count="1627" data-dec="0" data-pre="LR ">LR 0</span></div>
+      <div class="l">Likelihood-ratio statistic rejecting Black–Scholes/GBM on 17y of SPY daily returns (1313 on NIFTY 50). Critical value: 7.8.</div>
     </div>
     <div class="card stat">
-      <div class="v pos">+0.153</div>
-      <div class="l">Realised edge per contract for the correctly-specified desk — 95% bootstrap CI [0.146,&nbsp;0.159] vs the quoted 0.15 half-spread.</div>
+      <div class="v pos"><span data-count="0.153" data-dec="3" data-pre="+">+0.000</span></div>
+      <div class="l">Realised edge per contract, correctly-specified desk — 95% bootstrap CI [0.146, 0.159] vs the quoted 0.15 half-spread.</div>
     </div>
     <div class="card stat">
-      <div class="v neg">&minus;10.20</div>
-      <div class="l">Realised edge per contract for the same desk pricing Black&ndash;Scholes in a jump world — while its own model reports +0.15.</div>
+      <div class="v neg"><span data-count="-10.20" data-dec="2">0.00</span></div>
+      <div class="l">Realised edge for the same desk pricing Black–Scholes in a jump world — while its own model reports +0.15.</div>
     </div>
     <div class="card stat">
-      <div class="v neg">&gt; 170&times;</div>
-      <div class="l">Spread multiple the mispriced desk would need to be 95%-safe (&gt;$15 vs 8.8&cent;) — informed flow means no spread buys back a wrong model.</div>
+      <div class="v neg"><span data-count="170" data-dec="0" data-pre="&gt; " data-post="×">&gt; 0×</span></div>
+      <div class="l">Spread multiple the mispriced desk needs to be 95%-safe (&gt;$15 vs 8.8¢). Informed flow means no spread buys back a wrong model.</div>
     </div>
   </div>
 </section>
 
-<section>
-  <h2>What this project is</h2>
-  <p class="sub">A modified and extended version of the market-making teaching simulator from Quant Guild — rebuilt as a statistically rigorous model-risk study.</p>
+<section class="reveal">
+  <h2 class="term"><span class="prompt">$</span>whoami <span class="flag">--project</span></h2>
+  <p class="sub">A market-making teaching idea, rebuilt as a statistically rigorous model-risk study.</p>
   <p>
-    A market maker earns the bid&ndash;ask spread by quoting around <i>fair value</i> —
+    A market maker earns the bid–ask spread by quoting around <i>fair value</i> —
     but fair value comes from a model, and the model can be wrong. This project makes
     that danger measurable end-to-end:
   </p>
   <div class="grid c2" style="margin-top:18px">
-    <div class="card"><span class="num">01 — CALIBRATE</span>
+    <div class="card"><span class="num">[01] CALIBRATE</span>
       <h3>Fit the models to real markets</h3>
       <p>Maximum-likelihood estimation of GBM and Merton jump-diffusion on SPY and
-      NIFTY 50 daily returns — with standard errors, likelihood-ratio tests, AIC/BIC
-      and QQ diagnostics. Risk-neutral Merton calibration to four real SPY option-chain
+      NIFTY 50 daily returns — standard errors, likelihood-ratio tests, AIC/BIC,
+      QQ diagnostics. Risk-neutral Merton calibration to four real SPY option-chain
       snapshots, including 16 March 2020 (VIX 82): the COVID options market priced
-      &lambda;&nbsp;=&nbsp;3.7 crashes/year with mean jump &minus;31%.</p></div>
-    <div class="card"><span class="num">02 — SIMULATE</span>
+      λ = 3.7 crashes/year with mean jump −31%.</p></div>
+    <div class="card"><span class="num">[02] SIMULATE</span>
       <h3>Run the desk under model risk</h3>
       <p>A rolling constant-maturity options desk quotes bid/ask around its believed
       fair value; every fill's delta-hedged life is realised under the <i>true</i>
-      dynamics. Client flow is price-elastic, so a mispriced quote is punished by
+      dynamics. Client flow is price-elastic — a mispriced quote is punished by
       adverse selection, not ignored. Four scenarios: matched, steamroller,
-      right-model and overcautious.</p></div>
-    <div class="card"><span class="num">03 — MEASURE</span>
+      right-model, overcautious.</p></div>
+    <div class="card"><span class="num">[03] MEASURE</span>
       <h3>Price the model risk</h3>
       <p>Across hundreds of seeds: VaR and Expected Shortfall of desk P/L, drawdown
       distributions, and a <b>model-risk premium</b> — the extra spread a desk must
       charge to survive its own model uncertainty, found by break-even search.</p></div>
-    <div class="card"><span class="num">04 — VALIDATE</span>
+    <div class="card"><span class="num">[04] VALIDATE</span>
       <h3>Catch the broken model</h3>
       <p>Kupiec and Christoffersen VaR backtests (the mispriced desk blows through
-      its 5% VaR on 54% of days, p&nbsp;&lt;&nbsp;10<sup>&minus;16</sup>), bootstrap
-      confidence intervals on realised edge, and a CUSUM monitor that raises the
-      alarm at trade 83 of 1,467 — months before the equity curve makes it obvious.</p></div>
+      its 5% VaR on 54% of days, p &lt; 10<sup>−16</sup>), bootstrap confidence
+      intervals on realised edge, and a CUSUM monitor that raises the alarm at
+      trade 83 of 1,467 — months before the equity curve makes it obvious.</p></div>
   </div>
 </section>
 
-<section>
-  <h2>The one-picture summary</h2>
+<section class="reveal">
+  <h2 class="term"><span class="prompt">$</span>diff <span class="flag">belief reality</span></h2>
   <p class="sub">Same desk, same spread, same clients. Only the model assumption differs.</p>
   <figure class="fig">
     <img src="assets/figures/fig4_equity.svg" alt="Equity curves: matched model desk earns the spread; mispriced desk believes it is profitable while losing heavily">
     <figcaption><b>Left:</b> when the pricing model matches reality, realised P/L (blue)
     climbs along the promised spread income (dashed). <b>Right:</b> pricing
-    Black&ndash;Scholes while the world jumps — the desk's own model reports steady
-    profit (teal dashed, top) while true expectation and realised P/L collapse.
+    Black–Scholes while the world jumps — the desk's own model reports steady profit
+    (teal dashed, top) while true expectation and realised P/L collapse.
     The gap between those lines <i>is</i> model risk, in dollars.</figcaption>
   </figure>
 </section>
 
-<section>
-  <h2>Why it's built this way</h2>
+<section class="reveal">
+  <h2 class="term"><span class="prompt">$</span>cat <span class="flag">design-principles</span></h2>
   <ol class="pill-steps" style="margin-top:16px">
     <li><b>Real data, not assumed parameters.</b> Every model parameter in the
       headline experiments is estimated from market data — physical measure from
@@ -126,40 +144,165 @@
   </ol>
 </section>
 
-<section>
-  <h2>Explore</h2>
+<section class="reveal">
+  <h2 class="term"><span class="prompt">$</span>ls <span class="flag">./explore</span></h2>
   <div class="grid c3" style="margin-top:16px">
-    <div class="card"><h3>&#9654; Live demo</h3>
+    <div class="card"><h3>▶ Live demo</h3>
       <p>The full desk simulator runs in your browser — pick the true world and the
       desk's belief, watch the three P/L curves diverge.</p>
-      <p style="margin-top:10px"><a href="demo.html">Open the simulator &rarr;</a></p></div>
-    <div class="card"><h3>&Sigma; Methodology</h3>
-      <p>Every model, estimator and test written out with equations, at
-      bachelor's-level math &amp; statistics: what, why, how, and impact.</p>
-      <p style="margin-top:10px"><a href="methodology.html">Read it &rarr;</a></p></div>
-    <div class="card"><h3>&#128202; Results</h3>
+      <p style="margin-top:10px"><a href="demo.html">open the simulator →</a></p></div>
+    <div class="card"><h3>Σ Methodology</h3>
+      <p>Every model, estimator and test written out with equations, from scratch:
+      what, why, how, and impact.</p>
+      <p style="margin-top:10px"><a href="methodology.html">read it →</a></p></div>
+    <div class="card"><h3>▦ Results</h3>
       <p>All figures and tables: calibrations with standard errors, real volatility
       smiles, P/L distributions, backtests and monitors.</p>
-      <p style="margin-top:10px"><a href="results.html">See the numbers &rarr;</a></p></div>
+      <p style="margin-top:10px"><a href="results.html">see the numbers →</a></p></div>
   </div>
 </section>
 
-<section style="margin-top:50px">
+<section class="reveal" style="margin-top:50px">
   <div class="note">
     <b>Provenance &amp; honesty.</b> Underlying data: SPY and NIFTY 50 daily histories and
-    end-of-day SPY option chains (2008&ndash;2025) from public mirrors, documented in the
+    end-of-day SPY option chains (2008–2025) from public mirrors, documented in the
     repository. The desk is an educational abstraction — single contract, Bernoulli
     client flow, discrete hedging — deliberately simple so that every dollar of P/L is
-    attributable. This is a research/learning project, not trading advice.
+    attributable. Research/learning project, not trading advice.
   </div>
 </section>
 
 </div>
 
 <footer><div class="foot-inner">
-  <div>Model Risk Lab — built by <b>Arijit Ray</b> · MSc Statistics, IIT Bombay</div>
-  <div><a href="https://github.com/Arijitray2/model-risk-lab">Source &amp; data on GitHub</a></div>
+  <div>model-risk-lab · built by <b>Arijit Ray</b></div>
+  <div><a href="https://github.com/Arijitray2/model-risk-lab">source &amp; data on github</a></div>
 </div></footer>
+
+<script>
+"use strict";
+/* ============ hero: live mispriced desk ============ */
+(function(){
+  const cv = document.getElementById("heroCanvas");
+  const ctx = cv.getContext("2d");
+  let W, H, dpr;
+  function size(){
+    dpr = window.devicePixelRatio || 1;
+    W = cv.clientWidth; H = cv.clientHeight;
+    cv.width = W * dpr; cv.height = H * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  size(); addEventListener("resize", size);
+
+  // Merton world (COVID-flavoured), one tick per frame-ish
+  const SIG = 0.116, LAM = 3.68, MUJ = -0.22, SIGJ = 0.12, DT = 1/250;
+  const N = 260;                       // visible ticks
+  let S, path, bel, real, trades, jumpFlash, t;
+  function reset(){
+    S = 100; path = [S]; bel = 0; real = 0; trades = 0; jumpFlash = 0; t = 0;
+  }
+  reset();
+  function nrm(){ let u=0,v=0; while(!u)u=Math.random(); while(!v)v=Math.random();
+    return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v); }
+
+  const fmt = (x)=> (x>=0?"+":"") + x.toFixed(2);
+  const elS = document.getElementById("tkSpot"), elT = document.getElementById("tkTrades"),
+        elB = document.getElementById("tkBel"), elR = document.getElementById("tkReal"),
+        elJ = document.getElementById("tkJump");
+
+  let frame = 0;
+  function step(){
+    // world tick
+    let jumped = false;
+    let x = (0.06 - SIG*SIG/2)*DT + SIG*Math.sqrt(DT)*nrm();
+    if (Math.random() < LAM*DT){ x += MUJ + SIGJ*nrm(); jumped = true; }
+    S *= Math.exp(x);
+    path.push(S); if (path.length > N) path.shift();
+
+    // desk economics (stylised): fills arrive, desk believes +0.15 each,
+    // reality bleeds the mispricing and takes jump hits.
+    const fills = (Math.random() < 0.75) ? 1 : 0;
+    trades += fills;
+    bel += 0.15 * fills;
+    real += fills * (0.15 - 0.9 + 0.35*nrm());
+    if (jumped){ real -= 18 + 10*Math.random(); jumpFlash = 14; }
+
+    elS.textContent = S.toFixed(2);
+    elT.textContent = trades;
+    elB.textContent = fmt(bel);
+    elR.textContent = fmt(real);
+    elR.className = real >= 0 ? "up" : "dn";
+    elJ.style.opacity = jumpFlash > 0 ? 1 : 0;
+
+    t++;
+    if (t > 900) reset();              // loop the story
+  }
+
+  function draw(){
+    ctx.clearRect(0, 0, W, H);
+    // grid
+    ctx.strokeStyle = "rgba(255,255,255,0.05)"; ctx.lineWidth = 1;
+    for (let gy = 0.5; gy < H; gy += 42){ ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(W, gy); ctx.stroke(); }
+    // scale
+    const lo = Math.min(...path), hi = Math.max(...path), pad = (hi-lo)*0.12 + 1e-9;
+    const y = (v)=> H - ((v - lo + pad) / (hi - lo + 2*pad)) * H;
+    const x = (i)=> (i / (N-1)) * W;
+    // jump flash wash
+    if (jumpFlash > 0){
+      ctx.fillStyle = `rgba(230,103,103,${0.05 + 0.02*jumpFlash})`;
+      ctx.fillRect(0, 0, W, H); jumpFlash--;
+    }
+    // path glow
+    ctx.lineWidth = 2; ctx.lineJoin = "round";
+    ctx.shadowColor = "rgba(57,135,229,0.8)"; ctx.shadowBlur = 10;
+    ctx.strokeStyle = "#3987e5";
+    ctx.beginPath();
+    const off = N - path.length;
+    path.forEach((v,i)=>{ const px = x(off+i), py = y(v); i ? ctx.lineTo(px,py) : ctx.moveTo(px,py); });
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    // last-price marker + label
+    const lpx = x(off + path.length - 1), lpy = y(path[path.length-1]);
+    ctx.fillStyle = "#3987e5"; ctx.beginPath(); ctx.arc(lpx, lpy, 3.5, 0, 7); ctx.fill();
+    ctx.font = "11px ui-monospace, monospace"; ctx.fillStyle = "rgba(232,237,242,.85)";
+    ctx.fillText(path[path.length-1].toFixed(2), Math.min(lpx + 8, W - 44), lpy - 6);
+  }
+
+  function loop(){
+    frame++;
+    if (frame % 2 === 0) step();       // ~30 ticks/sec
+    draw();
+    requestAnimationFrame(loop);
+  }
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches){
+    for (let i = 0; i < N; i++) step(); draw();
+  } else loop();
+})();
+
+/* ============ count-up stats + reveal on scroll ============ */
+(function(){
+  const io = new IntersectionObserver((entries)=>{
+    entries.forEach(e=>{
+      if (!e.isIntersecting) return;
+      e.target.classList.add("in");
+      e.target.querySelectorAll("[data-count]").forEach(el=>{
+        if (el.dataset.done) return; el.dataset.done = 1;
+        const target = parseFloat(el.dataset.count), dec = +el.dataset.dec;
+        const pre = el.dataset.pre || "", post = el.dataset.post || "";
+        const t0 = performance.now(), DUR = 1400;
+        (function tick(now){
+          const p = Math.min((now - t0)/DUR, 1), ease = 1 - Math.pow(1-p, 3);
+          const v = target * ease;
+          el.textContent = pre + (target>0 && pre==="+" ? "" : "") + v.toFixed(dec) + post;
+          if (p < 1) requestAnimationFrame(tick);
+        })(t0);
+      });
+      io.unobserve(e.target);
+    });
+  }, { threshold: 0.25 });
+  document.querySelectorAll(".reveal").forEach(s=>io.observe(s));
+})();
+</script>
 
 </body>
 </html>
