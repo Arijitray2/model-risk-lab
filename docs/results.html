@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Results — Model Risk Lab</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+
+<nav><div class="nav-inner">
+  <a class="brand" href="index.html">Model<span>Risk</span>Lab</a>
+  <a class="link" href="index.html">Overview</a>
+  <a class="link" href="methodology.html">Methodology</a>
+  <a class="link" href="demo.html">Live demo</a>
+  <a class="link active" href="results.html">Results</a>
+  <a class="link gh" href="https://github.com/Arijitray2/model-risk-lab">GitHub &nearr;</a>
+</div></nav>
+
+<div class="wrap">
+
+<span class="kicker">Results</span>
+<h1>The numbers and the pictures</h1>
+<p class="lede">Every figure regenerates from <code>scripts/run_experiments.py</code>
+and <code>scripts/make_figures.py</code>; every table below is read live from the
+JSON files in this site's <code>assets/</code>.</p>
+
+<h2>1 · Real returns reject the Gaussian world</h2>
+<p>Seventeen-plus years of daily returns on each index, fitted by maximum likelihood.</p>
+<div id="tblPhysical"></div>
+<figure class="fig">
+  <img src="assets/figures/fig1_densities.svg" alt="Return densities: empirical vs GBM vs Merton on log scale">
+  <figcaption><b>Fig 1.</b> Daily-return densities on a log scale. The Gaussian (orange)
+  collapses many decades too fast in the tails; the fitted Merton mixture (blue) tracks the
+  empirical points (grey) across the entire range — including crash days a GBM world
+  essentially forbids.</figcaption>
+</figure>
+<figure class="fig">
+  <img src="assets/figures/fig2_qq_spy.svg" alt="QQ plots of SPY returns against GBM and Merton">
+  <figcaption><b>Fig 2.</b> QQ plots for SPY. Against GBM the empirical quantiles peel off
+  the diagonal violently in both tails; against the fitted Merton model they sit close to
+  the line — the jump mixture owns the tails.</figcaption>
+</figure>
+
+<h2>2 · What the options market believes</h2>
+<p>Merton fitted to four real SPY chains (~90 days to expiry), OTM quotes, vega-weighted.</p>
+<div id="tblRN"></div>
+<figure class="fig">
+  <img src="assets/figures/fig3_smiles.svg" alt="Implied volatility smiles and Merton fits on four real dates">
+  <figcaption><b>Fig 3.</b> Real implied-volatility skews (grey dots) vs the 4-parameter
+  Merton fit (blue) and the flat smile Black&ndash;Scholes implies (orange dashed). Even in
+  the calmest market the smile prices roughly one &minus;10% jump per year; in March 2020
+  it priced &lambda;&nbsp;&asymp;&nbsp;3.7 crashes/year with mean size &minus;31%.</figcaption>
+</figure>
+
+<h2>3 · The desk under model risk</h2>
+<div id="tblDesk"></div>
+<figure class="fig">
+  <img src="assets/figures/fig4_equity.svg" alt="Equity curves matched vs mispriced desk">
+  <figcaption><b>Fig 4.</b> One representative seed. Matched desk (left): realised P/L
+  climbs along the believed and true edge lines. Mispriced desk (right): belief and
+  reality diverge from the first fill.</figcaption>
+</figure>
+<figure class="fig">
+  <img src="assets/figures/fig5_pnl_distributions.svg" alt="P/L distributions across seeds for four scenarios">
+  <figcaption><b>Fig 5.</b> One-year P/L distribution across seeds (symlog scale).
+  Note both mismatched scenarios lose catastrophically <i>in both directions of
+  mispricing</i> — with price-elastic clients, quoting too high is punished by adverse
+  selection just as quoting too low is punished by the steamroller.</figcaption>
+</figure>
+<figure class="fig">
+  <img src="assets/figures/fig6_breakeven.svg" alt="Break-even spread curves">
+  <figcaption><b>Fig 6.</b> Loss probability vs quoted half-spread. The matched desk is
+  95%-safe from 8.8&cent;. The mispriced desk's curve decays so slowly that no half-spread
+  below $15 clears the bar — spread cannot buy back a wrong model when flow is informed.</figcaption>
+</figure>
+
+<h2>4 · Validation: catching it from P/L alone</h2>
+<div id="tblVal"></div>
+<figure class="fig">
+  <img src="assets/figures/fig8_var_exceptions.svg" alt="VaR exception timelines">
+  <figcaption><b>Fig 7.</b> 5% VaR exception timeline over a six-year run. Matched desk:
+  83 exceptions vs 75 expected, scattered (Kupiec p = 0.35). Mispriced desk: 811,
+  clustered into jump episodes (Kupiec and Christoffersen p &lt; 10<sup>&minus;16</sup>).</figcaption>
+</figure>
+<figure class="fig">
+  <img src="assets/figures/fig7_cusum.svg" alt="CUSUM monitoring paths">
+  <figcaption><b>Fig 8.</b> One-sided CUSUM on spot-scaled edge residuals. The matched
+  desk's statistic breathes below threshold for 900+ trades; the mispriced desk crosses
+  at trade 83 — an alarm roughly three weeks into a six-year run.</figcaption>
+</figure>
+
+<p class="note" id="fetchNote" style="display:none">Tables could not be loaded —
+if you opened this file directly from disk, serve the folder instead
+(<code>python -m http.server</code> in <code>docs/</code>) or view the hosted site.</p>
+
+<script>
+"use strict";
+const f=(x,d=3)=>x===null||x===undefined||Number.isNaN(x)?"–":(+x).toLocaleString("en-US",{maximumFractionDigits:d,minimumFractionDigits:0});
+const pm=(v,se,d=3)=>`${f(v,d)} <span style="color:var(--muted)">± ${f(se,d)}</span>`;
+
+async function j(name){const r=await fetch("assets/"+name);if(!r.ok)throw 0;return r.json();}
+
+(async()=>{try{
+  const [phys,rn,desk,val]=await Promise.all([
+    j("calibration_physical.json"),j("calibration_riskneutral.json"),
+    j("desk_experiments.json"),j("validation.json")]);
+
+  // --- physical calibration table
+  let h=`<table class="data"><tr><th>Series</th><th>n (days)</th>
+    <th>GBM &sigma;&#770;</th><th>Merton &sigma;&#770;</th><th>&lambda;&#770; (jumps/yr)</th>
+    <th>&mu;&#770;<sub>J</sub></th><th>&sigma;&#770;<sub>J</sub></th>
+    <th>LR vs GBM</th><th>&Delta;BIC</th></tr>`;
+  for(const k of ["spy","nifty"]){const d=phys[k],m=d.merton,g=d.gbm;
+    h+=`<tr><td><b>${d.label}</b><br><span style="color:var(--muted);font-size:12px">${d.date_range[0]} &rarr; ${d.date_range[1]}</span></td>
+    <td>${f(d.n_obs,0)}</td><td>${pm(g.params.sigma,g.se.sigma)}</td>
+    <td>${pm(m.params.sigma,m.se.sigma)}</td><td>${pm(m.params.lam,m.se.lam,1)}</td>
+    <td>${pm(m.params.mu_j,m.se.mu_j,4)}</td><td>${pm(m.params.sigma_j,m.se.sigma_j,4)}</td>
+    <td class="good">${f(m.lr_vs_gbm,0)}</td><td class="good">${f(g.bic-m.bic,0)}</td></tr>`;}
+  h+=`</table><p class="sub" style="margin-top:8px">&plusmn; are asymptotic standard errors
+  (observed Fisher information). LR compares nested models; &chi;&sup2;<sub>3</sub> 95% critical
+  value is 7.8 — the boundary-null caveat is discussed in the methodology. &Delta;BIC &gt; 10 is
+  conventionally "decisive".</p>`;
+  document.getElementById("tblPhysical").innerHTML=h;
+
+  // --- risk-neutral table
+  h=`<table class="data"><tr><th>Snapshot</th><th>Regime</th><th>Spot</th><th>ATM IV</th>
+  <th>&sigma;</th><th>&lambda;/yr</th><th>&mu;<sub>J</sub></th><th>&sigma;<sub>J</sub></th><th>RMSE (vol pts)</th></tr>`;
+  for(const [d,s] of Object.entries(rn)){const p=s.merton_params;
+    h+=`<tr><td><b>${d}</b></td><td>${s.label}</td><td>${f(s.spot,1)}</td>
+    <td>${f(s.atm_iv*100,1)}%</td><td>${f(p.sigma)}</td><td>${f(p.lam,2)}</td>
+    <td>${f(p.mu_j)}</td><td>${f(p.sigma_j)}</td><td>${f(s.rmse_iv*100,2)}</td></tr>`;}
+  h+=`</table>`;
+  document.getElementById("tblRN").innerHTML=h;
+
+  // --- desk table
+  const names={matched:"Matched (BS in GBM world)",right_model:"Right model (Merton in jump world)",
+               steamroller:"Steamroller (BS in jump world)",overcautious:"Overcautious (Merton in GBM world)"};
+  h=`<table class="data"><tr><th>Scenario</th><th>Seeds</th><th>Mean edge/contract<br>(95% bootstrap CI)</th>
+  <th>Believed edge</th><th>Mean P/L</th><th>VaR<sub>5%</sub></th><th>ES<sub>5%</sub></th><th>P(loss)</th></tr>`;
+  for(const k of ["matched","right_model","steamroller","overcautious"]){const d=desk[k];
+    const e=d.edge_ci,r5=d.risk.risk_5pct,bad=e.mean<0;
+    h+=`<tr><td><b>${names[k]}</b></td><td>${d.n_seeds}</td>
+    <td class="${bad?"bad":"good"}">${f(e.mean)} [${f(e.ci_low)}, ${f(e.ci_high)}]</td>
+    <td>${f(d.config.half_spread,2)}</td><td>${f(r5.mean,0)}</td>
+    <td>${f(r5.var,0)}</td><td>${f(r5.es,0)}</td>
+    <td class="${r5.prob_loss>0.2?"bad":""}">${f(r5.prob_loss*100,1)}%</td></tr>`;}
+  h+=`</table><p class="sub" style="margin-top:8px">Negative VaR/ES means the 5% tail is
+  still a profit. "Believed edge" is what the desk's own model reports per contract —
+  identical (+0.15) in every scenario, which is the whole point.</p>`;
+  document.getElementById("tblDesk").innerHTML=h;
+
+  // --- validation table
+  h=`<table class="data"><tr><th>Test</th><th>Matched desk</th><th>Mispriced desk</th><th>Reading</th></tr>`;
+  const km=val.kupiec_matched,ks=val.kupiec_steamroller,
+        cm=val.christoffersen_matched,cs=val.christoffersen_steamroller,
+        um=val.cusum_matched,us=val.cusum_steamroller;
+  h+=`<tr><td><b>Kupiec coverage</b> (5% VaR, 1,500 ticks)</td>
+  <td class="good">${km.exceptions} exc., p = ${f(km.p_value,3)}</td>
+  <td class="bad">${ks.exceptions} exc., p &lt; 10<sup>&minus;16</sup></td>
+  <td>Right model passes; wrong model blows through VaR on ${f(100*ks.exception_rate,0)}% of ticks.</td></tr>`;
+  h+=`<tr><td><b>Christoffersen CC</b> (coverage + independence)</td>
+  <td class="good">p = ${f(cm.p_cc,3)}</td><td class="bad">p &lt; 10<sup>&minus;16</sup></td>
+  <td>Mispriced desk's exceptions also cluster — the signature of unmodelled jumps.</td></tr>`;
+  h+=`<tr><td><b>CUSUM monitor</b> (edge under-delivery)</td>
+  <td class="good">no alarm in ${um.n_trades} trades</td>
+  <td class="bad">alarm at trade ${us.alarm_at_trade} of ${us.n_trades}</td>
+  <td>Detection ~3 weeks into a 6-year run, at a false-alarm rate of zero on the matched desk.</td></tr>`;
+  h+=`</table>`;
+  document.getElementById("tblVal").innerHTML=h;
+}catch(e){document.getElementById("fetchNote").style.display="block";}})();
+</script>
+
+</div>
+
+<footer><div class="foot-inner">
+  <div>Model Risk Lab — built by <b>Arijit Ray</b> · MSc Statistics, IIT Bombay</div>
+  <div><a href="https://github.com/Arijitray2/model-risk-lab">Source &amp; data on GitHub</a></div>
+</div></footer>
+
+</body>
+</html>

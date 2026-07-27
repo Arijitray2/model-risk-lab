@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Live demo — Model Risk Lab</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/vendor/plotly.min.js"></script>
+</head>
+<body>
+
+<nav><div class="nav-inner">
+  <a class="brand" href="index.html">Model<span>Risk</span>Lab</a>
+  <a class="link" href="index.html">Overview</a>
+  <a class="link" href="methodology.html">Methodology</a>
+  <a class="link active" href="demo.html">Live demo</a>
+  <a class="link" href="results.html">Results</a>
+  <a class="link gh" href="https://github.com/Arijitray2/model-risk-lab">GitHub &nearr;</a>
+</div></nav>
+
+<div class="wrap">
+
+<span class="kicker">Interactive simulator</span>
+<h1>Run the desk yourself</h1>
+<p class="lede">The full market-making engine, ported to JavaScript and running in
+your browser. Choose the <b>true world</b> and, separately, the <b>model the desk
+believes</b>. Presets carry the parameters calibrated to real SPY data. Everything
+is seeded — same seed, same run.</p>
+
+<div class="preset-row">
+  <button class="chip active" data-preset="matched">Matched — BS desk, GBM world</button>
+  <button class="chip" data-preset="steamroller">Steamroller — BS desk, COVID-jump world</button>
+  <button class="chip" data-preset="right">Right model — Merton desk, jump world</button>
+  <button class="chip" data-preset="overcautious">Overcautious — Merton desk, GBM world</button>
+</div>
+
+<div class="controls">
+  <div><label>True world model
+    <select id="trueModel"><option value="gbm">GBM (no jumps)</option><option value="merton">Merton (jumps)</option></select></label></div>
+  <div><label>Desk's pricing model
+    <select id="priceModel"><option value="bs">Black&ndash;Scholes</option><option value="merton">Merton</option></select></label></div>
+  <div><label>Option
+    <select id="optType"><option value="put">Put (crash insurance)</option><option value="call">Call</option></select></label></div>
+  <div><label>Diffusive vol &sigma; <input id="sigma" type="number" step="0.01" value="0.20"></label></div>
+  <div><label>Jump rate &lambda; (per yr) <input id="lam" type="number" step="0.1" value="0"></label></div>
+  <div><label>Mean jump &mu;<sub>J</sub> <input id="muj" type="number" step="0.01" value="0"></label></div>
+  <div><label>Jump std &sigma;<sub>J</sub> <input id="sigj" type="number" step="0.01" value="0"></label></div>
+  <div><label>Half-spread ($) <input id="spread" type="number" step="0.01" value="0.15"></label></div>
+  <div><label>P(client buys)/tick <input id="pAsk" type="number" step="0.05" min="0" max="1" value="0.5"></label></div>
+  <div><label>P(client sells)/tick <input id="pBid" type="number" step="0.05" min="0" max="1" value="0.1"></label></div>
+  <div><label>Flow elasticity &eta; <input id="elast" type="number" step="0.25" min="0" value="1"></label></div>
+  <div><label>Hedge rebalances <input id="hedgeN" type="number" step="5" min="1" value="30"></label></div>
+  <div><label>Ticks (1 yr = 250) <input id="nTicks" type="number" step="50" min="50" max="1000" value="250"></label></div>
+  <div><label>Seed <input id="seed" type="number" step="1" value="7"></label></div>
+  <div style="display:flex;align-items:flex-end"><button id="runBtn" class="btn primary" style="width:100%">&#9654; Run &amp; animate</button></div>
+  <div style="display:flex;align-items:flex-end"><button id="skipBtn" class="btn ghost" style="width:100%">Skip to end</button></div>
+</div>
+
+<div class="demo-stats">
+  <div class="card stat"><div class="v blue" id="stTrades">–</div><div class="l">contracts traded</div></div>
+  <div class="card stat"><div class="v" id="stPnl">–</div><div class="l">realised P/L ($)</div></div>
+  <div class="card stat"><div class="v" id="stBel">–</div><div class="l">edge the desk believes ($)</div></div>
+  <div class="card stat"><div class="v" id="stTrue">–</div><div class="l">true expected edge ($)</div></div>
+  <div class="card stat"><div class="v" id="stEdge">–</div><div class="l">realised edge / contract</div></div>
+  <div class="card stat"><div class="v" id="stDD">–</div><div class="l">max drawdown ($)</div></div>
+</div>
+
+<div class="chart-box"><div id="chS" style="height:230px"></div></div>
+<div class="chart-box"><div id="chQ" style="height:250px"></div></div>
+<div class="chart-box"><div id="chP" style="height:300px"></div></div>
+
+<p class="note" style="margin-top:22px"><b>Reading the bottom chart.</b> The teal
+dashed line is the edge the desk <i>believes</i> it is banking (half-spread per
+fill, measured against its own model). The orange dashed line is the true expected
+edge (measured against true fair value). The blue line is realised P/L. When the
+desk's model is right the three travel together; when it is wrong, the desk's
+belief keeps climbing while reality sinks — that gap is model risk in dollars.
+COVID-preset jump parameters (&lambda;=3.68/yr, mean &minus;31%) come from the real
+SPY chain of 16 Mar 2020.</p>
+
+<script>
+"use strict";
+/* ======================= seeded RNG ======================= */
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+function RNG(seed){this.u=mulberry32(seed);this.spare=null;}
+RNG.prototype.normal=function(){if(this.spare!==null){const v=this.spare;this.spare=null;return v;}
+  let u1=0;while(u1===0)u1=this.u();const u2=this.u();const m=Math.sqrt(-2*Math.log(u1));
+  this.spare=m*Math.sin(2*Math.PI*u2);return m*Math.cos(2*Math.PI*u2);};
+RNG.prototype.poisson=function(lam){if(lam<=0)return 0;const L=Math.exp(-lam);let k=0,p=1;
+  do{k++;p*=this.u();}while(p>L);return k-1;};
+
+/* ======================= pricing ======================= */
+function erf(x){const s=x<0?-1:1;x=Math.abs(x);const t=1/(1+0.3275911*x);
+  const y=1-(((((1.061405429*t-1.453152027)*t)+1.421413741)*t-0.284496736)*t+0.254829592)*t*Math.exp(-x*x);
+  return s*y;}
+const ncdf=x=>0.5*(1+erf(x/Math.SQRT2));
+function bsPrice(S,K,T,r,sig,type){if(T<=0||sig<=0){const d=Math.exp(-r*Math.max(T,0));
+  return type==="call"?Math.max(S-K*d,0):Math.max(K*d-S,0);}
+  const sq=Math.sqrt(T),d1=(Math.log(S/K)+(r+.5*sig*sig)*T)/(sig*sq),d2=d1-sig*sq;
+  return type==="call"?S*ncdf(d1)-K*Math.exp(-r*T)*ncdf(d2):K*Math.exp(-r*T)*ncdf(-d2)-S*ncdf(-d1);}
+function bsDelta(S,K,T,r,sig,type){if(T<=0||sig<=0){const i=type==="call"?(S>K?1:0):(S<K?1:0);
+  return type==="call"?i:i-1;}
+  const d1=(Math.log(S/K)+(r+.5*sig*sig)*T)/(sig*Math.sqrt(T));
+  return type==="call"?ncdf(d1):ncdf(d1)-1;}
+const NTERMS=60;
+function mertonPrice(S,K,T,r,p,type){const k=Math.exp(p.muj+.5*p.sigj*p.sigj)-1,lp=p.lam*(1+k);
+  let w=Math.exp(-lp*T),tot=0;
+  for(let n=0;n<NTERMS;n++){const sn=Math.sqrt(p.sig*p.sig+n*p.sigj*p.sigj/T),
+    rn=r-p.lam*k+n*(p.muj+.5*p.sigj*p.sigj)/T;
+    tot+=w*bsPrice(S,K,T,rn,sn,type);w*=lp*T/(n+1);}
+  return tot;}
+function mertonDelta(S,K,T,r,p,type){const k=Math.exp(p.muj+.5*p.sigj*p.sigj)-1,lp=p.lam*(1+k);
+  let w=Math.exp(-lp*T),tot=0;
+  for(let n=0;n<NTERMS;n++){const sn=Math.sqrt(p.sig*p.sig+n*p.sigj*p.sigj/T),
+    rn=r-p.lam*k+n*(p.muj+.5*p.sigj*p.sigj)/T;
+    tot+=w*bsDelta(S,K,T,rn,sn,type);w*=lp*T/(n+1);}
+  return tot;}
+
+/* ======================= simulation engine ======================= */
+function pricer(model,r,sig,jump){ // jump={lam,muj,sigj}
+  if(model==="bs")return{price:(S,K,T,t)=>bsPrice(S,K,T,r,sig,t),
+                         delta:(S,K,T,t)=>bsDelta(S,K,T,r,sig,t)};
+  const p={sig:sig,lam:jump.lam,muj:jump.muj,sigj:jump.sigj};
+  return{price:(S,K,T,t)=>mertonPrice(S,K,T,r,p,t),
+         delta:(S,K,T,t)=>mertonDelta(S,K,T,r,p,t)};}
+
+function stepLog(cfg,dt,rng){ // one log-increment of the TRUE world
+  let x=(cfg.mu-.5*cfg.sigma*cfg.sigma)*dt+cfg.sigma*Math.sqrt(dt)*rng.normal();
+  if(cfg.trueModel==="merton"&&cfg.lam>0){const k=Math.exp(cfg.muj+.5*cfg.sigj*cfg.sigj)-1;
+    const n=rng.poisson(cfg.lam*dt);
+    if(n>0)x+=cfg.muj*n+cfg.sigj*Math.sqrt(n)*rng.normal();
+    x-=cfg.lam*k*dt;}
+  return x;}
+
+function realizeTrade(cfg,bel,S0f,K,prem,side,rng){
+  const m=cfg.hedgeN,dth=cfg.T/m,g=Math.exp(cfg.r*dth);
+  const path=new Float64Array(m+1);path[0]=S0f;
+  for(let j=0;j<m;j++)path[j+1]=path[j]*Math.exp(stepLog(cfg,dth,rng));
+  const nOpt=side==="sell"?-1:1;let pnl=side==="sell"?prem:-prem;
+  for(let j=0;j<m;j++){const tau=cfg.T-j*dth,del=bel.delta(path[j],K,tau,cfg.opt);
+    pnl+=Math.exp(-cfg.r*j*dth)*(-nOpt*del)*(path[j+1]-path[j]*g);}
+  const pay=cfg.opt==="call"?Math.max(path[m]-K,0):Math.max(K-path[m],0);
+  return pnl+Math.exp(-cfg.r*cfg.T)*nOpt*pay;}
+
+function runDesk(cfg){
+  const rng=new RNG(cfg.seed),n=cfg.nTicks,dt=1/250;
+  const bel=pricer(cfg.priceModel,cfg.r,cfg.sigma,{lam:cfg.lam,muj:cfg.muj,sigj:cfg.sigj});
+  const tru=cfg.trueModel==="merton"
+    ?pricer("merton",cfg.r,cfg.sigma,{lam:cfg.lam,muj:cfg.muj,sigj:cfg.sigj})
+    :pricer("bs",cfg.r,cfg.sigma,null);
+  const out={t:[],S:[],bid:[],ask:[],vm:[],vt:[],real:[],bel:[],tru:[],trades:[]};
+  let S=100,realized=0,expM=0,expT=0,trades=0;
+  for(let i=0;i<=n;i++){
+    const K=S,vm=bel.price(S,K,cfg.T,cfg.opt),vt=tru.price(S,K,cfg.T,cfg.opt);
+    const bid=vm-cfg.spread,ask=vm+cfg.spread;
+    out.t.push(i*dt);out.S.push(S);out.bid.push(bid);out.ask.push(ask);
+    out.vm.push(vm);out.vt.push(vt);out.real.push(realized);
+    out.bel.push(expM);out.tru.push(expT);out.trades.push(trades);
+    if(i===n)break;
+    const s=Math.max(cfg.spread,1e-9);
+    const eA=(ask-vt)/s-1,eB=(vt-bid)/s-1;
+    const pA=Math.min(.98,cfg.pAsk*Math.exp(Math.max(-10,Math.min(2,-cfg.elast*eA))));
+    const pB=Math.min(.98,cfg.pBid*Math.exp(Math.max(-10,Math.min(2,-cfg.elast*eB))));
+    if(rng.u()<pA){trades++;expM+=ask-vm;expT+=ask-vt;
+      realized+=realizeTrade(cfg,bel,S,K,ask,"sell",rng);}
+    if(rng.u()<pB){trades++;expM+=vm-bid;expT+=vt-bid;
+      realized+=realizeTrade(cfg,bel,S,K,bid,"buy",rng);}
+    S*=Math.exp(stepLog(cfg,dt,rng));
+  }
+  return out;}
+
+/* ======================= presets ======================= */
+const COVID={sigma:0.116,lam:3.68,muj:-0.308,sigj:0.190};
+const PRESETS={
+  matched:      {trueModel:"gbm",priceModel:"bs",sigma:0.20,lam:0,muj:0,sigj:0},
+  steamroller:  {trueModel:"merton",priceModel:"bs",sigma:COVID.sigma,lam:COVID.lam,muj:COVID.muj,sigj:COVID.sigj},
+  right:        {trueModel:"merton",priceModel:"merton",sigma:COVID.sigma,lam:COVID.lam,muj:COVID.muj,sigj:COVID.sigj},
+  overcautious: {trueModel:"gbm",priceModel:"merton",sigma:0.20,lam:COVID.lam,muj:COVID.muj,sigj:COVID.sigj}};
+
+document.querySelectorAll(".chip").forEach(ch=>ch.addEventListener("click",()=>{
+  document.querySelectorAll(".chip").forEach(c=>c.classList.remove("active"));
+  ch.classList.add("active");
+  const p=PRESETS[ch.dataset.preset];
+  document.getElementById("trueModel").value=p.trueModel;
+  document.getElementById("priceModel").value=p.priceModel;
+  document.getElementById("sigma").value=p.sigma;
+  document.getElementById("lam").value=p.lam;
+  document.getElementById("muj").value=p.muj;
+  document.getElementById("sigj").value=p.sigj;
+  run();
+}));
+
+/* ======================= charts & animation ======================= */
+const BLUE="#2a78d6",ORANGE="#eb6834",AQUA="#1baf7a",RED="#e34948",INK2="#52514e",GRID="#e1e0d9",SURF="#fcfcfb";
+const baseLayout=t=>({title:{text:t,font:{size:13,color:"#0b0b0b"},x:0.02},
+  margin:{l:56,r:16,t:34,b:34},paper_bgcolor:SURF,plot_bgcolor:SURF,
+  font:{family:"system-ui,-apple-system,sans-serif",size:11,color:INK2},
+  xaxis:{gridcolor:GRID,zeroline:false,title:{text:"time (years)",font:{size:10.5}}},
+  yaxis:{gridcolor:GRID,zeroline:false},
+  legend:{orientation:"h",y:1.18,x:0.3,font:{size:10.5}},showlegend:true});
+let timer=null,sim=null,pos=0;
+
+function initCharts(){
+  Plotly.newPlot("chS",[{x:[],y:[],name:"underlying S",line:{color:BLUE,width:2}}],
+    baseLayout("True underlying path"),{displayModeBar:false,responsive:true});
+  Plotly.newPlot("chQ",[
+    {x:[],y:[],name:"desk ask",line:{color:BLUE,width:1.4}},
+    {x:[],y:[],name:"desk bid",line:{color:BLUE,width:1.4,dash:"dot"}},
+    {x:[],y:[],name:"true fair value",line:{color:ORANGE,width:2}}],
+    baseLayout("The desk's quotes vs true fair value ($ per option)"),{displayModeBar:false,responsive:true});
+  Plotly.newPlot("chP",[
+    {x:[],y:[],name:"realised P/L",line:{color:BLUE,width:2.4}},
+    {x:[],y:[],name:"edge desk believes",line:{color:AQUA,width:2,dash:"dash"}},
+    {x:[],y:[],name:"true expected edge",line:{color:ORANGE,width:2,dash:"dash"}}],
+    baseLayout("Cumulative P/L: belief vs truth vs reality ($)"),{displayModeBar:false,responsive:true});
+}
+
+function cfgFromUI(){return{
+  trueModel:val("trueModel"),priceModel:val("priceModel"),opt:val("optType"),
+  sigma:+val("sigma"),lam:+val("lam"),muj:+val("muj"),sigj:+val("sigj"),
+  spread:+val("spread"),pAsk:+val("pAsk"),pBid:+val("pBid"),elast:+val("elast"),
+  hedgeN:Math.max(1,Math.round(+val("hedgeN"))),nTicks:Math.max(50,Math.round(+val("nTicks"))),
+  seed:Math.round(+val("seed")),mu:0.06,r:0.02,T:0.25};}
+const val=id=>document.getElementById(id).value;
+
+function setStats(i){
+  const f=(x,d)=>x.toLocaleString("en-US",{maximumFractionDigits:
+    d!==undefined?d:(Math.abs(x)>=1000?0:2)});
+  const el=(id,v,color)=>{const e=document.getElementById(id);e.textContent=v;
+    e.className="v "+(color||"");};
+  el("stTrades",f(sim.trades[i],0),"blue");
+  el("stPnl",f(sim.real[i]),sim.real[i]>=0?"pos":"neg");
+  el("stBel",f(sim.bel[i]),"");
+  el("stTrue",f(sim.tru[i]),sim.tru[i]>=0?"":"neg");
+  const e=sim.trades[i]>0?sim.real[i]/sim.trades[i]:0;
+  el("stEdge",f(e,3),e>=0?"pos":"neg");
+  let peak=-1e18,dd=0;
+  for(let j=0;j<=i;j++){peak=Math.max(peak,sim.real[j]);dd=Math.max(dd,peak-sim.real[j]);}
+  el("stDD",f(dd),dd>50?"neg":"");
+}
+
+function draw(from,to){
+  const sl=a=>a.slice(from,to);
+  Plotly.extendTraces("chS",{x:[sl(sim.t)],y:[sl(sim.S)]},[0]);
+  Plotly.extendTraces("chQ",{x:[sl(sim.t),sl(sim.t),sl(sim.t)],
+    y:[sl(sim.ask),sl(sim.bid),sl(sim.vt)]},[0,1,2]);
+  Plotly.extendTraces("chP",{x:[sl(sim.t),sl(sim.t),sl(sim.t)],
+    y:[sl(sim.real),sl(sim.bel),sl(sim.tru)]},[0,1,2]);
+}
+
+function run(){
+  if(timer){clearInterval(timer);timer=null;}
+  initCharts();
+  const cfg=cfgFromUI();
+  document.getElementById("runBtn").textContent="computing…";
+  setTimeout(()=>{
+    sim=runDesk(cfg);pos=0;
+    document.getElementById("runBtn").innerHTML="&#9654; Run & animate";
+    const chunk=Math.max(1,Math.round(sim.t.length/220));
+    timer=setInterval(()=>{
+      const next=Math.min(pos+chunk,sim.t.length);
+      draw(pos,next);pos=next;setStats(pos-1);
+      if(pos>=sim.t.length){clearInterval(timer);timer=null;}
+    },28);
+  },30);
+}
+document.getElementById("runBtn").addEventListener("click",run);
+document.getElementById("skipBtn").addEventListener("click",()=>{
+  if(!sim)return;if(timer){clearInterval(timer);timer=null;}
+  draw(pos,sim.t.length);pos=sim.t.length;setStats(pos-1);});
+
+initCharts();
+document.querySelector('.chip[data-preset="matched"]').click();
+</script>
+
+</div>
+
+<footer><div class="foot-inner">
+  <div>Model Risk Lab — built by <b>Arijit Ray</b> · MSc Statistics, IIT Bombay</div>
+  <div><a href="https://github.com/Arijitray2/model-risk-lab">Source &amp; data on GitHub</a></div>
+</div></footer>
+
+</body>
+</html>

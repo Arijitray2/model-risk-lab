@@ -1,0 +1,147 @@
+/* Model Risk Lab — shared styles. Palette: validated light-mode tokens. */
+:root {
+  --page: #f9f9f7;
+  --surface: #fcfcfb;
+  --ink: #0b0b0b;
+  --ink2: #52514e;
+  --muted: #898781;
+  --grid: #e1e0d9;
+  --line: #c3c2b7;
+  --blue: #2a78d6;
+  --blue-dark: #1c5cab;
+  --blue-wash: #eaf2fc;
+  --orange: #eb6834;
+  --aqua: #1baf7a;
+  --red: #e34948;
+  --violet: #4a3aa7;
+  --radius: 10px;
+  --border: rgba(11, 11, 11, 0.10);
+  --mono: "SFMono-Regular", ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  background: var(--page);
+  color: var(--ink);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 16px;
+  line-height: 1.65;
+}
+
+/* ---- nav ---- */
+nav {
+  position: sticky; top: 0; z-index: 50;
+  background: rgba(252, 252, 251, 0.92);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+.nav-inner {
+  max-width: 1060px; margin: 0 auto; padding: 0 24px;
+  display: flex; align-items: center; gap: 26px; height: 58px;
+}
+.brand { font-weight: 700; font-size: 17px; color: var(--ink); text-decoration: none; letter-spacing: -0.01em; }
+.brand span { color: var(--blue); }
+nav a.link { color: var(--ink2); text-decoration: none; font-size: 14.5px; padding: 4px 2px; border-bottom: 2px solid transparent; }
+nav a.link:hover { color: var(--ink); }
+nav a.link.active { color: var(--blue-dark); border-bottom-color: var(--blue); }
+nav .gh { margin-left: auto; }
+
+/* ---- layout ---- */
+.wrap { max-width: 1060px; margin: 0 auto; padding: 34px 24px 80px; }
+.hero { padding: 64px 0 30px; }
+.kicker {
+  display: inline-block; font-size: 12.5px; font-weight: 600; letter-spacing: 0.10em;
+  text-transform: uppercase; color: var(--blue-dark);
+  background: var(--blue-wash); border: 1px solid rgba(42,120,214,.25);
+  padding: 3px 12px; border-radius: 999px; margin-bottom: 18px;
+}
+h1 { font-size: clamp(30px, 5vw, 46px); line-height: 1.12; letter-spacing: -0.02em; margin: 0 0 18px; }
+h1 .accent { color: var(--blue); }
+.lede { font-size: 19px; color: var(--ink2); max-width: 46em; margin: 0 0 8px; }
+h2 { font-size: 26px; letter-spacing: -0.01em; margin: 54px 0 6px; }
+h3 { font-size: 19px; margin: 30px 0 6px; }
+.sub { color: var(--muted); font-size: 14.5px; margin: 0 0 22px; }
+p { max-width: 72ch; }
+a { color: var(--blue-dark); }
+code { font-family: var(--mono); font-size: 0.88em; background: #f0efec; padding: 1px 5px; border-radius: 4px; }
+pre { background: #14141a; color: #e8e8f0; border-radius: var(--radius); padding: 18px 20px; overflow-x: auto; font-size: 13.5px; line-height: 1.55; }
+pre code { background: none; color: inherit; padding: 0; }
+
+/* ---- cards & grids ---- */
+.grid { display: grid; gap: 16px; }
+.grid.c2 { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+.grid.c3 { grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
+.grid.c4 { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 20px 22px;
+}
+.card h3 { margin: 4px 0 8px; font-size: 17px; }
+.card p { font-size: 14.5px; color: var(--ink2); margin: 0; }
+.card .num { font-size: 13px; font-weight: 700; color: var(--blue); letter-spacing: .06em; }
+
+/* stat tiles */
+.stat { text-align: left; }
+.stat .v { font-size: 32px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; }
+.stat .v.pos { color: var(--aqua); }
+.stat .v.neg { color: var(--red); }
+.stat .v.blue { color: var(--blue); }
+.stat .l { font-size: 13px; color: var(--ink2); margin-top: 6px; }
+
+/* buttons */
+.btn {
+  display: inline-block; padding: 11px 22px; border-radius: 8px;
+  font-weight: 600; font-size: 15px; text-decoration: none;
+  border: 1px solid transparent; cursor: pointer;
+}
+.btn.primary { background: var(--blue); color: #fff; }
+.btn.primary:hover { background: var(--blue-dark); }
+.btn.ghost { border-color: var(--line); color: var(--ink); background: var(--surface); }
+.btn.ghost:hover { border-color: var(--ink2); }
+.btn-row { display: flex; gap: 12px; flex-wrap: wrap; margin: 26px 0 8px; }
+
+/* figure blocks */
+figure.fig { margin: 26px 0; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; }
+figure.fig img { width: 100%; height: auto; display: block; }
+figure.fig figcaption { font-size: 13.5px; color: var(--ink2); padding: 12px 6px 2px; line-height: 1.5; }
+figure.fig figcaption b { color: var(--ink); }
+
+/* tables */
+table.data { width: 100%; border-collapse: collapse; font-size: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+table.data th { text-align: left; font-size: 12.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 600; padding: 10px 14px; border-bottom: 1px solid var(--grid); background: #f5f5f2; }
+table.data td { padding: 9px 14px; border-bottom: 1px solid var(--grid); font-variant-numeric: tabular-nums; }
+table.data tr:last-child td { border-bottom: none; }
+table.data td.good { color: #006300; font-weight: 600; }
+table.data td.bad { color: var(--red); font-weight: 600; }
+
+/* equation blocks */
+.eqbox { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--blue); border-radius: 8px; padding: 14px 20px; margin: 18px 0; overflow-x: auto; }
+.whywhat { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin: 18px 0 8px; }
+.whywhat .cell { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; font-size: 14px; color: var(--ink2); }
+.whywhat .cell b { display: block; color: var(--ink); font-size: 12.5px; text-transform: uppercase; letter-spacing: .07em; margin-bottom: 6px; }
+.whywhat .cell.why b { color: var(--orange); }
+.whywhat .cell.how b { color: var(--blue); }
+.whywhat .cell.impact b { color: var(--aqua); }
+
+/* demo controls */
+.controls { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; }
+.controls label { font-size: 12px; color: var(--ink2); display: block; font-weight: 600; }
+.controls select, .controls input { width: 100%; margin-top: 4px; padding: 7px 9px; border: 1px solid var(--line); border-radius: 6px; font-size: 14px; background: #fff; color: var(--ink); font-family: inherit; }
+.preset-row { display: flex; gap: 10px; flex-wrap: wrap; margin: 16px 0; }
+.chip { border: 1px solid var(--line); background: var(--surface); color: var(--ink2); border-radius: 999px; padding: 7px 16px; font-size: 13.5px; font-weight: 600; cursor: pointer; }
+.chip:hover { border-color: var(--blue); color: var(--blue-dark); }
+.chip.active { background: var(--blue-wash); border-color: var(--blue); color: var(--blue-dark); }
+.chart-box { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px; margin-top: 14px; }
+.demo-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 14px; }
+
+/* footer */
+footer { border-top: 1px solid var(--border); margin-top: 70px; }
+.foot-inner { max-width: 1060px; margin: 0 auto; padding: 26px 24px; font-size: 13.5px; color: var(--muted); display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+footer a { color: var(--ink2); }
+
+.note { font-size: 13.5px; color: var(--ink2); background: #f5f2e8; border: 1px solid #e5decb; border-radius: 8px; padding: 12px 16px; }
+.pill-steps { counter-reset: step; padding-left: 0; list-style: none; max-width: 72ch; }
+.pill-steps li { counter-increment: step; position: relative; padding: 4px 0 14px 44px; }
+.pill-steps li::before { content: counter(step); position: absolute; left: 0; top: 4px; width: 27px; height: 27px; background: var(--blue-wash); color: var(--blue-dark); border: 1px solid rgba(42,120,214,.3); border-radius: 999px; display: flex; align-items: center; justify-content: center; font-size: 13.5px; font-weight: 700; }
